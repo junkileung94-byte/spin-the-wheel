@@ -1,0 +1,60 @@
+/* Shared theme for the wheel, operator panel and OBS overlay.
+   Uses system fonts and a bundled SVG; no external assets are required. */
+
+:root {
+  /* surfaces — the deep-water end of the kit */
+  --k-bg: #070a1e;
+  --k-bg-2: #0d1130;
+  --k-surface: #14103a;
+  --k-surface-2: #1c1547;
+  --k-line: #2e2260;
+
+  /* type */
+  --k-ink: #f7ecff;
+  --k-ink-dim: #b9a9dc;
+  --k-ink-faint: #7c6da8;
+
+  /* the neon */
+  --k-accent: #ff2fd0;
+  --k-accent-hot: #ff62e0;
+  --k-accent-soft: #f9c4f3;
+  --k-violet: #7b2ff7;
+  --k-lilac: #c04ff0;
+  --k-deep: #3b2f8f;
+  --k-cyan: #4fd8ff;
+  --k-gold: #ffd76f;
+
+  /* wheel slices — alternating hot/deep so adjacent labels never blur together */
+  --k-wheel-1: #ff2fd0;
+  --k-wheel-2: #3b2f8f;
+  --k-wheel-3: #ff6fe0;
+  --k-wheel-4: #7b2ff7;
+  --k-wheel-5: #e11fa8;
+  --k-wheel-6: #4a2a7a;
+  --k-wheel-7: #ff9ae8;
+  --k-wheel-8: #c04ff0;
+
+  /* effects */
+  --k-glow: 0 0 12px rgba(255, 47, 208, 0.55), 0 0 34px rgba(255, 47, 208, 0.25);
+  --k-glow-soft: 0 0 8px rgba(255, 138, 232, 0.4);
+  --k-radius: 14px;
+  --k-radius-lg: 22px;
+
+  --k-font: "Trebuchet MS", system-ui, sans-serif;
+  --k-logo: url("/assets/wheel.svg");
+}
+
+/* Neon text, the one effect the whole kit is built on. */
+.neon {
+  color: #fff;
+  text-shadow:
+    0 0 4px #fff,
+    0 0 10px var(--k-accent-hot),
+    0 0 22px var(--k-accent),
+    0 0 44px rgba(255, 47, 208, 0.55);
+}
+
+.neon-soft {
+  color: var(--k-accent-soft);
+  text-shadow: 0 0 10px rgba(255, 47, 208, 0.55);
+}

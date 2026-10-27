@@ -1,0 +1,13 @@
+services:
+  wheel:
+    build: .
+    ports:
+      - "127.0.0.1:${HOST_PORT:-21030}:21030"
+    volumes:
+      - wheel-data:/app/data
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 15s
+
+volumes:
+  wheel-data:

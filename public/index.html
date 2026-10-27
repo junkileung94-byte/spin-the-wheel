@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Spin the Wheel</title>
+    <link rel="icon" href="/assets/wheel.svg" />
+    <link rel="stylesheet" href="/css/theme.css" />
+    <link rel="stylesheet" href="/css/app.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="logo"></div>
+        <div>
+          <div class="brandname neon-soft" id="brandName">Spin the Wheel</div>
+          <div class="brandsub">Spin the Wheel</div>
+        </div>
+        <div class="spacer"></div>
+        <div class="status"><span class="dot" id="dot"></span><span id="statusText">connecting…</span></div>
+      </header>
+
+      <div class="main">
+        <section class="stage">
+          <div class="wheel-wrap">
+            <div class="stage-title neon" id="stageTitle"></div>
+            <canvas id="wheel"></canvas>
+          </div>
+        </section>
+
+        <aside class="panel">
+          <div class="tabs" role="tablist">
+            <button class="tab" role="tab" aria-selected="true" data-tab="entries">Entries</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="wheels">Wheels</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="settings">Settings</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="history">History</button>
+          </div>
+
+          <div class="tabpanel active" data-panel="entries">
+            <h2>Entries — one per line</h2>
+            <textarea id="entries" spellcheck="false" placeholder="Type one name per line…"></textarea>
+            <div class="row wrap">
+              <button class="btn small" id="shuffleBtn">Shuffle</button>
+              <button class="btn small" id="sortBtn">Sort</button>
+              <button class="btn small" id="dedupeBtn">Dedupe</button>
+              <button class="btn small" id="recolorBtn">Recolour</button>
+              <span class="spacer"></span>
+              <span class="hint" id="count">0</span>
+            </div>
+            <button class="btn primary spin-btn" id="spinBtn">SPIN</button>
+            <div class="hint">Click the wheel to spin. Everyone watching — page and overlay — spins together.</div>
+          </div>
+
+          <div class="tabpanel" data-panel="wheels">
+            <h2>Saved wheels</h2>
+            <div class="row">
+              <input type="text" id="wheelName" placeholder="Name this wheel" />
+              <button class="btn small" id="saveWheel">Save</button>
+            </div>
+            <div class="list" id="wheelList"></div>
+            <div class="row wrap">
+              <button class="btn small" id="exportBtn">Export JSON</button>
+              <button class="btn small" id="importBtn">Import JSON</button>
+              <button class="btn small" id="shareBtn">Copy share link</button>
+            </div>
+            <input type="file" id="importFile" accept="application/json" hidden />
+          </div>
+
+          <div class="tabpanel" data-panel="settings">
+            <h2>Wheel</h2>
+            <label class="field">
+              Title on stream
+              <input type="text" id="titleInput" maxlength="60" />
+            </label>
+            <div class="grid2">
+              <label class="field">
+                Spin time min (s)
+                <input type="text" id="durMin" inputmode="decimal" />
+              </label>
+              <label class="field">
+                Spin time max (s)
+                <input type="text" id="durMax" inputmode="decimal" />
+              </label>
+            </div>
+            <label class="field">
+              Pointer
+              <select id="pointer">
+                <option value="top">Top</option>
+                <option value="right">Right</option>
+                <option value="bottom">Bottom</option>
+                <option value="left">Left</option>
+              </select>
+            </label>
+            <label class="check"><input type="checkbox" id="removeWinner" /> Remove winner after each spin</label>
+            <label class="check"><input type="checkbox" id="confetti" /> Bubble explosion on win</label>
+            <label class="check"><input type="checkbox" id="sound" /> Sound</label>
+            <label class="check"><input type="checkbox" id="tick" /> Tick per slice</label>
+            <label class="field">
+              Volume
+              <input type="range" id="volume" min="0" max="1" step="0.02" />
+            </label>
+            <button class="btn small ghost" id="fullscreenBtn">Fullscreen wheel</button>
+          </div>
+
+          <div class="tabpanel" data-panel="history">
+            <h2>Recent winners</h2>
+            <div class="list" id="historyList"></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="winner-veil" id="winnerVeil">
+      <div class="winner-card">
+        <div class="winner-kicker">Winner</div>
+        <div class="winner-name neon" id="winnerName"></div>
+        <div class="row" style="justify-content: center; gap: 10px">
+          <button class="btn" id="winnerClose">Close</button>
+          <button class="btn danger" id="winnerRemove">Remove &amp; close</button>
+          <button class="btn primary" id="winnerAgain">Spin again</button>
+        </div>
+      </div>
+    </div>
+
+    <canvas id="bubbles"></canvas>
+    <div class="toast" id="toast"></div>
+
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>

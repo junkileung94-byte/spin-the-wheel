@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Spin the Wheel Overlay</title>
+    <link rel="stylesheet" href="/css/theme.css" />
+    <link rel="stylesheet" href="/css/overlay.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <div class="wheel-holder">
+        <div class="ov-title neon" id="ovTitle"></div>
+        <canvas id="wheel"></canvas>
+      </div>
+    </div>
+
+    <div id="winner">
+      <div class="wcard">
+        <div class="wkicker">Winner</div>
+        <div class="wname neon" id="wname"></div>
+      </div>
+    </div>
+
+    <canvas id="bubbles"></canvas>
+    <script type="module" src="/js/overlay.js"></script>
+  </body>
+</html>

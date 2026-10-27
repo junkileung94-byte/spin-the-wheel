@@ -27,7 +27,7 @@ test("fresh self-host loads .env, keeps credentials private and restores data af
   let child;
   let output = "";
   const stop = async () => {
-    if (!child || child.exitCode !== null) return;
+    if (!child || child.exitCode !== null || child.signalCode !== null) return;
     const exited = once(child, "exit");
     child.kill("SIGTERM");
     await exited;

@@ -9,7 +9,7 @@
 
 const COLORS = ["#ff2fd0", "#ff6fe0", "#f9c4f3", "#c04ff0", "#7b2ff7", "#4fd8ff", "#ffffff"];
 
-export function createBubbles(canvas) {
+export function createBubbles(canvas, { onPop } = {}) {
   const ctx = canvas.getContext("2d");
   let dpr = 1;
   let particles = [];
@@ -101,6 +101,7 @@ export function createBubbles(canvas) {
         }
       } else if (p.life > p.ttl || p.y < -60) {
         p.pop = 0.001; // start popping
+        onPop?.(p.r);
       }
 
       const k = Math.exp(-p.drag * dt);

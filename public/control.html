@@ -181,13 +181,20 @@
             </label>
 
             <h2>Sound</h2>
-            <div class="hint">Sound plays from the wheel page. The OBS overlay is silent; capture the wheel page audio if you want it on stream.</div>
             <label class="check"><input type="checkbox" id="sound" /> Sound effects</label>
             <label class="check"><input type="checkbox" id="tick" /> Click as each slice passes the pointer</label>
+            <label class="check"><input type="checkbox" id="popSounds" /> Pop sound for each bubble</label>
+            <label class="check"><input type="checkbox" id="overlaySound" /> Play the sounds in the OBS overlay</label>
+            <div class="hint">
+              The wheel page always plays sound (after one click on it). Turn on the OBS option to hear the sounds on
+              stream from the overlay instead; leave it off if OBS already captures the wheel page's audio, or you
+              will hear everything twice.
+            </div>
             <label class="field">
               Volume
               <input type="range" id="volume" min="0" max="1" step="0.02" />
             </label>
+            <button class="btn small" id="soundTest">▶ Play the sounds here</button>
           </div>
 
           <!-- STREAM ----------------------------------------------------------->
@@ -225,6 +232,7 @@
       </main>
     </div>
 
+    <canvas id="bubbles"></canvas>
     <div class="toast" id="toast" role="status"></div>
     <script type="module" src="/js/control.js"></script>
   </body>

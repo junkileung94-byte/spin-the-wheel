@@ -12,6 +12,7 @@
 import { applyLogo } from "./brand.js";
 import { createBubbles } from "./bubbles.js";
 import { connect } from "./net.js";
+import { createSound } from "./sound.js";
 import { createWheel } from "./wheel.js";
 
 const params = new URLSearchParams(location.search);
@@ -25,13 +26,25 @@ const autohideParam = params.get("autohide");
 $("wheel").style.width = `${wheelSize}px`;
 $("wheel").style.height = `${wheelSize}px`;
 
-const bubbles = createBubbles($("bubbles"));
+// Sound here is opt-in (dashboard: "Play sounds in the OBS overlay"), so a streamer who
+// already captures the wheel page's audio never hears everything twice. OBS lets a browser
+// source play audio without a click; a normal browser tab stays silent until clicked.
+const sound = createSound();
+const audible = () => Boolean(state?.settings.overlaySound && state.settings.sound);
+const bubbles = createBubbles($("bubbles"), {
+  onPop: (r) => audible() && state.settings.popSounds !== false && sound.pop(r),
+});
 let state = null;
 let hideTimer = null;
 let spinning = false;
 
 const net = connect({ key: params.get("key") || "" });
-const wheel = createWheel($("wheel"), { now: () => net.now() });
+const wheel = createWheel($("wheel"), {
+  now: () => net.now(),
+  onTick() {
+    if (audible() && state.settings.tick) sound.tick();
+  },
+});
 
 net.on((msg) => {
   if (msg.t === "welcome" || msg.t === "state") {
@@ -41,6 +54,7 @@ net.on((msg) => {
     hideWinner();
     bubbles.clear();
     reveal(true);
+    if (audible()) sound.whoosh();
     wheel.run(msg, state.angle, () => {});
   } else if (msg.t === "settled") {
     spinning = false;
@@ -55,6 +69,9 @@ function apply(next) {
   wheel.setEntries(state.entries);
   if (!wheel.isSpinning()) wheel.setAngle(state.angle);
   applyLogo(state.logo, wheel);
+  sound.enabled = audible();
+  sound.setVolume(state.settings.volume);
+  if (audible()) sound.unlock();
 
   const showTitle = showTitleParam && state.overlay.showTitle !== false;
   $("ovTitle").textContent = state.title;
@@ -79,6 +96,7 @@ function showWinner(label) {
   $("winner").classList.add("show");
   $("stage").classList.add("dimmed");
   if (state?.settings.confetti !== false) bubbles.celebrate(190);
+  if (audible()) sound.fanfare();
 
   clearTimeout(hideTimer);
   const secs = autohideParam !== null ? Number(autohideParam) : (state?.settings.autohideSec ?? 7);

@@ -88,9 +88,19 @@ test("dashboard sign-in link, logo upload and pages", { timeout: 20000 }, async 
     assert.match(await page.text(), /Edit wheel/);
     assert.equal((await fetch(base + route, { redirect: "manual" })).status, 302, `${route} needs sign-in`);
   }
-  for (const asset of ["/css/dashboard.css", "/js/control.js", "/js/brand.js", "/fonts/Quicksand-Bold.ttf"]) {
+  const sounds = ["spin", "tick", "tick2", "win", "bubbles", "pop1", "pop2", "pop3", "pop4"].map((n) => `/sounds/${n}.wav`);
+  for (const asset of ["/css/dashboard.css", "/js/control.js", "/js/brand.js", "/js/sound.js", "/fonts/Quicksand-Bold.ttf", ...sounds]) {
     assert.equal((await fetch(base + asset)).status, 200, `asset reachable: ${asset}`);
   }
+
+  // every sound is a real WAV file
+  for (const s of sounds) {
+    const head = Buffer.from(await (await fetch(base + s)).arrayBuffer()).subarray(0, 12).toString("latin1");
+    assert.ok(head.startsWith("RIFF") && head.endsWith("WAVE"), `${s} is a WAV file`);
+  }
+  const st = (await welcome(base)).state.settings;
+  assert.equal(st.popSounds, true, "bubble pop sounds default on");
+  assert.equal(st.overlaySound, false, "overlay sound defaults off so audio is never doubled");
 
   // default logo, then an upload that every socket hears about
   const before = await fetch(`${base}/api/logo`);

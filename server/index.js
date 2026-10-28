@@ -90,6 +90,8 @@ const DEFAULT_SETTINGS = {
   volume: 0.6,
   autohideSec: 7,
   confetti: true,
+  popSounds: true,
+  overlaySound: false,
 };
 
 const newId = () => crypto.randomBytes(6).toString("hex");
@@ -335,7 +337,7 @@ function onMessage(msg, role, ws) {
       if (msg.settings.volume !== undefined) s.volume = n(msg.settings.volume, 0, 1, s.volume);
       if (msg.settings.pointer !== undefined && POINTER_ANGLE[msg.settings.pointer] !== undefined)
         s.pointer = msg.settings.pointer;
-      for (const k of ["removeWinner", "sound", "tick", "confetti"]) {
+      for (const k of ["removeWinner", "sound", "tick", "confetti", "popSounds", "overlaySound"]) {
         if (msg.settings[k] !== undefined) s[k] = Boolean(msg.settings[k]);
       }
       if (s.turnsMax < s.turnsMin) s.turnsMax = s.turnsMin;

@@ -65,7 +65,7 @@ The dashboard at `/control` is where you run the wheel. It shows a live copy of 
 | --- | --- |
 | **Edit wheel** | Change the title. Add, rename, recolour, reorder and remove entries one by one, or paste a whole list. Shuffle, sort, new colours. Save the wheel by name and load it again later. |
 | **Pick winner** | Tap an entry to make it win the next spin, line up several winners, lock one in, change chances or stop an entry from winning. Nothing picked means every spin is random. |
-| **Look & sound** | Upload your logo (PNG, JPG, WebP or GIF), spin length, pointer position, removing winners, bubble burst, how long the winner popup stays on stream, sound and volume. |
+| **Look & sound** | Upload your logo (PNG, JPG, WebP or GIF), spin length, pointer position, removing winners, bubble burst, how long the winner popup stays on stream, sound effects, bubble pops, sound in the OBS overlay, volume, and a button to hear every sound. |
 | **Stream (OBS)** | Copy the OBS link, preview the overlay, test the winner popup, show or hide the wheel and its title on stream. |
 | **History** | Recent winners, with entries you picked marked. |
 
@@ -148,7 +148,7 @@ For Node.js, stop the app, run `npm ci --ignore-scripts`, then `npm start`. For 
 | Dashboard asks for a code | Run `npm run dashboard-link` and open the link, or paste `controlToken` (not `overlayKey`). Check whether `CONTROL_TOKEN` overrides the file. |
 | Logo upload fails | Use PNG, JPG, WebP or GIF. Large images are shrunk in the browser before upload. |
 | Data disappears after restart | Check the data path, Docker volume and write permissions. Avoid changing Compose project folders without migrating data. |
-| No sound | Click the page first, enable sound and check browser/OBS audio settings. |
+| No sound | Click the wheel page once (browsers block sound until a click), check **Sound effects** and the volume. For sound from OBS, tick **Play the sounds in the OBS overlay** and tick "Control audio via OBS" on the browser source. |
 
 Health endpoint: <http://127.0.0.1:21030/api/health>. It should return `ok: true` while the server is ready.
 
@@ -165,4 +165,4 @@ Tests use disposable data, not the running wheel. CI exercises Node.js 22/24 on 
 
 The app is a single Node.js process using Express, WebSockets and JSON files. It is not a multi-user SaaS service. Run one process per data directory. The main editor has no login or per-user permissions. Any reverse proxy must authenticate access to the **entire app**, including static pages, API and WebSocket routes. Use HTTPS outside loopback, keep dependencies current and treat all data backups as private.
 
-To change colours, edit `public/css/theme.css`. Upload your logo from the dashboard rather than editing files. The bundled Quicksand font is licensed under the SIL Open Font License (`public/fonts/OFL.txt`).
+The sound effects in `public/sounds/` were generated with Higgsfield; see `public/sounds/CREDITS.md` to swap in your own. To change colours, edit `public/css/theme.css`. Upload your logo from the dashboard rather than editing files. The bundled Quicksand font is licensed under the SIL Open Font License (`public/fonts/OFL.txt`).

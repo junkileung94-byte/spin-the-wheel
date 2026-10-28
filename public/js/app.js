@@ -8,7 +8,9 @@ import { createWheel } from "./wheel.js";
 const $ = (id) => document.getElementById(id);
 
 const sound = createSound();
-const bubbles = createBubbles($("bubbles"));
+const bubbles = createBubbles($("bubbles"), {
+  onPop: (r) => state?.settings.sound && state.settings.popSounds !== false && sound.pop(r),
+});
 
 let state = null;
 let entriesDirty = false;

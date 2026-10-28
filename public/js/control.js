@@ -4,6 +4,8 @@
 // Right column: tabs for editing entries, picking a winner, look & sound, OBS, history.
 import { applyLogo } from "./brand.js";
 import { connect } from "./net.js";
+import { createBubbles } from "./bubbles.js";
+import { createSound } from "./sound.js";
 import { createWheel } from "./wheel.js";
 
 const $ = (id) => document.getElementById(id);
@@ -525,6 +527,8 @@ function fillLook() {
   set("tick", "checked", s.tick);
   set("volume", "value", s.volume);
   set("autohide", "value", s.autohideSec);
+  set("popSounds", "checked", s.popSounds !== false);
+  set("overlaySound", "checked", Boolean(s.overlaySound));
   $("autohideVal").textContent = s.autohideSec;
 }
 
@@ -533,12 +537,27 @@ const sendSettings = (patch) => net.send({ t: "settings:set", settings: patch })
 $("durMin").addEventListener("change", (e) => sendSettings({ durationMin: Number(e.target.value) * 1000 }));
 $("durMax").addEventListener("change", (e) => sendSettings({ durationMax: Number(e.target.value) * 1000 }));
 $("pointer").addEventListener("change", (e) => sendSettings({ pointer: e.target.value }));
-for (const id of ["removeWinner", "confetti", "sound", "tick"]) {
+for (const id of ["removeWinner", "confetti", "sound", "tick", "popSounds", "overlaySound"]) {
   $(id).addEventListener("change", (e) => sendSettings({ [id]: e.target.checked }));
 }
 $("volume").addEventListener("change", (e) => sendSettings({ volume: Number(e.target.value) }));
 $("autohide").addEventListener("input", (e) => ($("autohideVal").textContent = e.target.value));
 $("autohide").addEventListener("change", (e) => sendSettings({ autohideSec: Number(e.target.value) }));
+
+// A local preview of every sound, at the current volume, without spinning the real wheel.
+const preview = createSound();
+const previewBubbles = createBubbles($("bubbles"), { onPop: (r) => preview.pop(r) });
+$("soundTest").addEventListener("click", async () => {
+  preview.setVolume(state.settings.volume);
+  preview.enabled = true;
+  await preview.ready();
+  preview.whoosh();
+  [0, 120, 260, 420, 620, 860, 1150].forEach((ms) => setTimeout(() => preview.tick(), 500 + ms));
+  setTimeout(() => {
+    preview.fanfare();
+    previewBubbles.celebrate(90);
+  }, 2000);
+});
 
 $("logoPick").addEventListener("click", () => $("logoFile").click());
 $("logoFile").addEventListener("change", async (e) => {

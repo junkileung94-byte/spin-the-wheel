@@ -234,6 +234,11 @@ select:focus {
   flex-wrap: wrap;
 }
 
+a.btn {
+  text-decoration: none;
+  display: inline-block;
+}
+
 .btn {
   border: 1px solid var(--k-line);
   background: rgba(255, 255, 255, 0.05);
@@ -457,8 +462,18 @@ input[type="range"] {
   body {
     overflow: auto;
   }
+  /* stacked layout: let the page grow instead of squeezing the panel over the wheel */
+  .shell {
+    height: auto;
+    min-height: 100%;
+  }
   .main {
     grid-template-columns: 1fr;
+    flex: none;
+  }
+  /* room for the title that sits above the wheel */
+  .stage {
+    padding-top: 36px;
   }
   .wheel-wrap {
     width: min(92vw, 560px);

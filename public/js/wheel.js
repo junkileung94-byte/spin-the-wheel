@@ -41,7 +41,7 @@ function inkFor(hex) {
 export function createWheel(canvas, opts = {}) {
   const ctx = canvas.getContext("2d");
   const logo = new Image();
-  logo.src = opts.logo || "/assets/wheel.svg";
+  logo.src = opts.logo || "/api/logo";
 
   let entries = [];
   let rot = 0;
@@ -94,32 +94,119 @@ export function createWheel(canvas, opts = {}) {
     // labels
     ctx.save();
     ctx.translate(cx, cy);
-    const fontSize = Math.max(11, Math.min(r * 0.11, (r * 1.35 * theta) / 1.15, 34));
-    ctx.font = `700 ${fontSize}px Quicksand, sans-serif`;
     ctx.textBaseline = "middle";
-    const maxW = r * 0.68;
+    // Labels run from just inside the rim towards the hub. Long entries shrink first, then
+    // wrap onto a second line, and only then get an ellipsis, so they stay readable on stream.
+    const maxW = r * 0.66;
+    const baseSize = Math.max(11, Math.min(r * 0.1, (r * 1.35 * theta) / 1.15, 34));
+    // slice width per unit of radius: wrapped lines must fit across the slice at
+    // the label's inner end, where the slice is narrowest
+    const spread = 2 * Math.sin(Math.min(theta, Math.PI) / 2) * 0.9;
+    const outer = r * 0.9;
 
     for (let i = 0; i < n; i++) {
       const mid = rot + (i + 0.5) * theta;
       // labels on the left half would sit upside-down, so flip them and read outward-in
       const flip = norm(mid) > Math.PI / 2 && norm(mid) < (3 * Math.PI) / 2;
+      const { size, lines } = cachedLayout(entries[i].label, maxW, baseSize, outer, spread);
       ctx.save();
       ctx.rotate(flip ? mid + Math.PI : mid);
+      ctx.font = `700 ${size}px Quicksand, "Trebuchet MS", sans-serif`;
       ctx.fillStyle = inkFor(entries[i].color || "#ff2fd0");
       ctx.shadowColor = "rgba(0,0,0,0.35)";
-      ctx.shadowBlur = fontSize * 0.35;
+      ctx.shadowBlur = size * 0.35;
       ctx.textAlign = flip ? "left" : "right";
-      ctx.fillText(fit(entries[i].label, maxW), flip ? -r * 0.9 : r * 0.9, 0);
+      const lh = size * 1.08;
+      lines.forEach((line, k) => {
+        ctx.fillText(line, flip ? -r * 0.9 : r * 0.9, (k - (lines.length - 1) / 2) * lh);
+      });
       ctx.restore();
     }
     ctx.restore();
   }
 
-  function fit(text, maxW) {
-    if (ctx.measureText(text).width <= maxW) return text;
+  const widthAt = (text, size) => {
+    ctx.font = `700 ${size}px Quicksand, "Trebuchet MS", sans-serif`;
+    return ctx.measureText(text).width;
+  };
+
+  function ellipsize(text, maxW, size) {
+    if (widthAt(text, size) <= maxW) return text;
     let s = text;
-    while (s.length > 2 && ctx.measureText(`${s}…`).width > maxW) s = s.slice(0, -1);
-    return `${s}…`;
+    while (s.length > 1 && widthAt(`${s.trimEnd()}…`, size) > maxW) s = s.slice(0, -1);
+    return `${s.trimEnd()}…`;
+  }
+
+  // Layout is measured once per label and size, not on every animation frame.
+  const layoutCache = new Map();
+  function cachedLayout(text, maxW, baseSize, outer, spread) {
+    const key = `${text}|${maxW.toFixed(1)}|${baseSize.toFixed(1)}|${outer.toFixed(1)}|${spread.toFixed(4)}`;
+    let hit = layoutCache.get(key);
+    if (!hit) {
+      if (layoutCache.size > 500) layoutCache.clear();
+      hit = layoutLabel(text, maxW, baseSize, outer, spread);
+      layoutCache.set(key, hit);
+    }
+    return hit;
+  }
+
+  /** Greedy word wrap at a given size. Returns null if a single word is wider than maxW. */
+  function wrap(text, maxW, size) {
+    const words = text.split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = "";
+    for (const w of words) {
+      if (widthAt(w, size) > maxW) return null;
+      const next = line ? `${line} ${w}` : w;
+      if (widthAt(next, size) <= maxW) line = next;
+      else {
+        lines.push(line);
+        line = w;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  /**
+   * Largest font size at which the label fits its slice: along the slice (maxW) and across
+   * it near the label's inner end, where the slice is narrowest. Long labels may wrap onto up
+   * to three lines; one line wins unless wrapping allows a clearly bigger font. Only when
+   * nothing fits does the label get an ellipsis.
+   */
+  function layoutLabel(text, maxW, baseSize, outer, spread) {
+    const minSize = Math.max(8, Math.min(baseSize, 11));
+    const fits = (lines, size) => {
+      const widest = Math.max(...lines.map((l) => widthAt(l, size)));
+      if (widest > maxW) return false;
+      // a single line must clear its neighbours right at its inner end; wrapped lines are
+      // centred, so only the longest reaches that far in
+      const at = outer - widest * (lines.length === 1 ? 1 : 0.85);
+      return lines.length * size * 1.08 <= at * spread;
+    };
+
+    let single = null;
+    let multi = null;
+    for (let size = baseSize; size >= minSize && !(single && multi); size -= 0.5) {
+      if (!single && fits([text], size)) single = { size, lines: [text] };
+      if (!multi) {
+        const lines = wrap(text, maxW, size);
+        if (lines && lines.length > 1 && lines.length <= 3 && fits(lines, size)) multi = { size, lines };
+      }
+    }
+    if (single && (!multi || single.size >= multi.size * 0.8)) return single;
+    if (multi) return multi;
+
+    // nothing fits whole: three small lines with the last one trimmed, or one trimmed line
+    const lines = wrap(text, maxW, minSize);
+    if (lines && lines.length > 3 && fits(lines.slice(0, 3), minSize)) {
+      const kept = lines.slice(0, 3);
+      kept[2] = ellipsize(lines.slice(2).join(" "), maxW, minSize);
+      return { size: minSize, lines: kept };
+    }
+    // trim to the length at which the line still clears its neighbours
+    const room = Math.max(minSize * 2, Math.min(maxW, outer - (minSize * 1.08) / spread));
+    return { size: minSize, lines: [ellipsize(text, room, minSize)] };
   }
 
   function shade(hex, amt) {
@@ -161,9 +248,13 @@ export function createWheel(canvas, opts = {}) {
     ctx.stroke();
 
     if (logo.complete && logo.naturalWidth) {
+      // fit inside the hub without stretching non-square logos
       const d = hr * 1.62;
+      const k = d / Math.max(logo.naturalWidth, logo.naturalHeight);
+      const w = logo.naturalWidth * k;
+      const h = logo.naturalHeight * k;
       ctx.globalAlpha = 0.96;
-      ctx.drawImage(logo, cx - d / 2, cy - d / 2, d, d);
+      ctx.drawImage(logo, cx - w / 2, cy - h / 2, w, h);
     }
     ctx.restore();
   }
@@ -274,6 +365,11 @@ export function createWheel(canvas, opts = {}) {
 
   window.addEventListener("resize", resize);
   logo.addEventListener("load", render);
+  // canvas text does not trigger a web font download, so ask for it and redraw once it lands
+  document.fonts?.load('700 20px "Quicksand"').then(() => {
+    layoutCache.clear(); // measured with the fallback font until now
+    render();
+  }, () => {});
   queueMicrotask(resize);
 
   return {
@@ -290,6 +386,9 @@ export function createWheel(canvas, opts = {}) {
       if (anim) return;
       rot = a;
       render();
+    },
+    setLogo(src) {
+      if (src && logo.getAttribute("src") !== src) logo.src = src;
     },
     getAngle: () => rot,
     isSpinning: () => Boolean(anim),

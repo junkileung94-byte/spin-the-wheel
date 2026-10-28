@@ -21,6 +21,22 @@ const PUBLIC = path.join(ROOT, "public");
 
 // ---------------------------------------------------------------- config
 
+// `npm start` passes .env to Node, but a service that runs `node server/index.js` directly
+// (systemd, older Node) does not. Values already in the environment always win.
+function loadEnv() {
+  let text;
+  try {
+    text = fs.readFileSync(path.join(ROOT, ".env"), "utf8");
+  } catch {
+    return;
+  }
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+  }
+}
+loadEnv();
+
 const PORT = Number(process.env.PORT || 21030);
 const BIND = process.env.BIND || "127.0.0.1";
 const SPIN_LEAD_MS = Number(process.env.SPIN_LEAD_MS || 250);
@@ -93,6 +109,33 @@ const DEFAULT_ENTRIES = [
   "Mystery box",
 ].map(makeEntry);
 
+// ---------------------------------------------------------------- logo
+
+// A custom logo lives in the data directory, never in public/, so updates and backups
+// treat it like the rest of the streamer's data. SVG is refused: served same-origin it
+// could carry script.
+const LOGO_TYPES = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
+const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+
+function findLogo() {
+  for (const ext of Object.values(LOGO_TYPES)) {
+    const file = path.join(DATA_DIR, `logo.${ext}`);
+    if (fs.existsSync(file)) return file;
+  }
+  return null;
+}
+
+function removeLogos() {
+  for (const ext of Object.values(LOGO_TYPES)) fs.rmSync(path.join(DATA_DIR, `logo.${ext}`), { force: true });
+}
+
+const logoVersion = () => {
+  const file = findLogo();
+  return file ? Math.round(fs.statSync(file).mtimeMs) : 0;
+};
+
+// ---------------------------------------------------------------- state
+
 const persisted = store.loadState();
 const state = {
   title: persisted?.title ?? "Spin the Wheel",
@@ -100,6 +143,7 @@ const state = {
   settings: { ...DEFAULT_SETTINGS, ...(persisted?.settings || {}) },
   angle: persisted?.angle ?? 0,
   overlay: persisted?.overlay ?? { visible: true, showTitle: true },
+  logo: logoVersion(),
   spin: null, // live spin, public-safe fields only
 };
 
@@ -130,6 +174,7 @@ function snapshotFor(role) {
     settings: state.settings,
     angle: state.angle,
     overlay: state.overlay,
+    logo: state.logo,
     spinning: Boolean(inflight),
     // Mid-spin joiners (an OBS source that restarted) get the live spin and catch up.
     spin: state.spin,
@@ -353,7 +398,9 @@ function onMessage(msg, role, ws) {
       break;
 
     case "overlay:set":
-      state.overlay = { ...state.overlay, ...msg.overlay };
+      for (const k of ["visible", "showTitle"]) {
+        if (msg.overlay?.[k] !== undefined) state.overlay = { ...state.overlay, [k]: Boolean(msg.overlay[k]) };
+      }
       persist();
       pushState();
       break;
@@ -374,32 +421,88 @@ function onMessage(msg, role, ws) {
 
 const app = express();
 app.disable("x-powered-by");
-app.use(express.json({ limit: "256kb" }));
+const smallJson = express.json({ limit: "256kb" });
+app.use((req, res, next) => (req.path === "/api/logo" ? next() : smallJson(req, res, next)));
 app.use(express.urlencoded({ extended: false }));
 
 app.get("/api/health", (_req, res) =>
   res.json({ ok: true, entries: state.entries.length, spinning: Boolean(inflight) }),
 );
 
+const isControlReq = (req) => auth.isControl(parseCookies(req.headers.cookie || "")[COOKIE]);
+
 const requireControl = (req, res, next) => {
-  if (auth.isControl(parseCookies(req.headers.cookie || "")[COOKIE])) return next();
+  if (isControlReq(req)) return next();
   return res.redirect("/login");
 };
 
-app.get("/login", (_req, res) => res.sendFile(path.join(PUBLIC, "login.html")));
+const signIn = (res) => {
+  res.setHeader(
+    "Set-Cookie",
+    `${COOKIE}=${encodeURIComponent(auth.controlToken)}; Path=/; Max-Age=${60 * 60 * 24 * 365}; HttpOnly; SameSite=Lax`,
+  );
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  return res.redirect("/control");
+};
+
+// The one-click sign-in link (`npm run dashboard-link`) carries the token once; the server
+// swaps it for the cookie and redirects so the token does not stay in the address bar.
+app.get("/login", (req, res) => {
+  if (typeof req.query.token === "string" && auth.isControl(req.query.token.trim())) return signIn(res);
+  return res.sendFile(path.join(PUBLIC, "login.html"));
+});
 
 app.post("/login", (req, res) => {
-  if (auth.isControl((req.body?.token || "").trim())) {
-    res.setHeader(
-      "Set-Cookie",
-      `${COOKIE}=${encodeURIComponent(auth.controlToken)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; HttpOnly; SameSite=Lax`,
-    );
-    return res.redirect("/control");
-  }
+  if (auth.isControl((req.body?.token || "").trim())) return signIn(res);
   return res.redirect("/login?bad=1");
 });
 
-app.get("/control", requireControl, (_req, res) => res.sendFile(path.join(PUBLIC, "control.html")));
+app.get("/logout", (_req, res) => {
+  res.setHeader("Set-Cookie", `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
+  return res.redirect("/login");
+});
+
+app.get(["/control", "/dashboard"], requireControl, (_req, res) =>
+  res.sendFile(path.join(PUBLIC, "control.html")),
+);
+
+app.get("/api/logo", (_req, res) => {
+  const file = findLogo();
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.sendFile(file || path.join(PUBLIC, "assets", "wheel.svg"));
+});
+
+app.post("/api/logo", requireControlApi, express.json({ limit: "3mb" }), (req, res) => {
+  const m = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body?.dataUrl || ""));
+  const ext = m && LOGO_TYPES[m[1]];
+  if (!ext) return res.status(400).json({ ok: false, error: "Use a PNG, JPG, WebP or GIF image." });
+  const bytes = Buffer.from(m[2], "base64");
+  if (!bytes.length || bytes.length > LOGO_MAX_BYTES) {
+    return res.status(400).json({ ok: false, error: "Image must be 2 MB or smaller." });
+  }
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  removeLogos();
+  const target = path.join(DATA_DIR, `logo.${ext}`);
+  fs.writeFileSync(`${target}.tmp`, bytes);
+  fs.renameSync(`${target}.tmp`, target);
+  state.logo = logoVersion();
+  pushState();
+  return res.json({ ok: true });
+});
+
+app.delete("/api/logo", requireControlApi, (_req, res) => {
+  removeLogos();
+  state.logo = 0;
+  pushState();
+  return res.json({ ok: true });
+});
+
+function requireControlApi(req, res, next) {
+  if (isControlReq(req)) return next();
+  return res.status(401).json({ ok: false, error: "Sign in to the dashboard first." });
+}
 app.get("/overlay", (_req, res) => res.sendFile(path.join(PUBLIC, "overlay.html")));
 
 app.use(
@@ -413,8 +516,10 @@ const server = http.createServer(app);
 const bus = createBus({ server, auth, onMessage, snapshotFor });
 
 server.listen(PORT, BIND, () => {
-  console.log(`[spin-the-wheel] http://${BIND}:${PORT}`);
-  console.log("[auth] Open your private data/secrets.json file locally for operator credentials; do not share it.");
+  const host = BIND === "0.0.0.0" || BIND === "::" ? "127.0.0.1" : BIND;
+  console.log(`[spin-the-wheel] wheel:     http://${host}:${PORT}/`);
+  console.log(`[spin-the-wheel] dashboard: http://${host}:${PORT}/control`);
+  console.log("[spin-the-wheel] one-click dashboard sign-in link: run `npm run dashboard-link` in this folder");
 });
 
 for (const sig of ["SIGINT", "SIGTERM"]) {

@@ -1,4 +1,5 @@
 // Main wheel page.
+import { applyLogo } from "./brand.js";
 import { createBubbles } from "./bubbles.js";
 import { connect } from "./net.js";
 import { createSound } from "./sound.js";
@@ -48,6 +49,7 @@ function applyState(next) {
   wheel.setPointer(state.settings.pointer);
   wheel.setEntries(state.entries);
   if (!wheel.isSpinning()) wheel.setAngle(state.angle);
+  applyLogo(state.logo, wheel);
 
   $("brandName").textContent = state.title;
   $("stageTitle").textContent = state.title;
@@ -64,8 +66,8 @@ function applyState(next) {
 
   renderWheels();
   renderHistory();
+  fillSettings(); // another tab or the dashboard may have changed them
   if (first) {
-    fillSettings();
     // a shared link carries its entries in the hash
     const shared = readShareHash();
     if (shared?.length) {
@@ -162,8 +164,20 @@ $("dedupeBtn").addEventListener("click", () => {
   pushEntries();
 });
 
+const PALETTE = ["#ff2fd0", "#7b2ff7", "#ff6fe0", "#3b2f8f", "#c04ff0", "#ff9ae8", "#4a2a7a", "#e11fa8", "#4fd8ff", "#ffd76f"];
+
 $("recolorBtn").addEventListener("click", () => {
-  net.send({ t: "entries:set", entries: parseEntries().map((label) => ({ label })) });
+  // start the palette at a random point so every press gives a visibly different wheel
+  const offset = Math.floor(Math.random() * PALETTE.length);
+  const byLabel = new Map(state.entries.map((e) => [e.label, e]));
+  net.send({
+    t: "entries:set",
+    entries: parseEntries().map((label, i) => ({
+      id: byLabel.get(label)?.id,
+      label,
+      color: PALETTE[(i + offset) % PALETTE.length],
+    })),
+  });
 });
 
 // ── winner popup buttons ────────────────────────────────────────────────
@@ -203,15 +217,18 @@ for (const tab of document.querySelectorAll(".tab")) {
 
 function fillSettings() {
   const s = state.settings;
-  $("titleInput").value = state.title;
-  $("durMin").value = (s.durationMin / 1000).toFixed(1);
-  $("durMax").value = (s.durationMax / 1000).toFixed(1);
-  $("pointer").value = s.pointer;
-  $("removeWinner").checked = s.removeWinner;
-  $("confetti").checked = s.confetti;
-  $("sound").checked = s.sound;
-  $("tick").checked = s.tick;
-  $("volume").value = s.volume;
+  const set = (id, prop, value) => {
+    if (document.activeElement !== $(id)) $(id)[prop] = value;
+  };
+  set("titleInput", "value", state.title);
+  set("durMin", "value", (s.durationMin / 1000).toFixed(1));
+  set("durMax", "value", (s.durationMax / 1000).toFixed(1));
+  set("pointer", "value", s.pointer);
+  set("removeWinner", "checked", s.removeWinner);
+  set("confetti", "checked", s.confetti);
+  set("sound", "checked", s.sound);
+  set("tick", "checked", s.tick);
+  set("volume", "value", s.volume);
 }
 
 const sendSettings = (patch) => net.send({ t: "settings:set", settings: patch });
@@ -270,7 +287,6 @@ $("saveWheel").addEventListener("click", () => {
   toast(`Saved “${name}”`);
 });
 
-// The public snapshot has no wheels list — only the control panel does. Hide the tab there.
 function renderHistory() {
   const list = $("historyList");
   list.innerHTML = "";

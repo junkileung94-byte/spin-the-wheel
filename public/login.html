@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Control — sign in</title>
-    <link rel="icon" href="/assets/wheel.svg" />
+    <link rel="icon" href="/api/logo" />
     <link rel="stylesheet" href="/css/theme.css" />
     <link rel="stylesheet" href="/css/app.css" />
     <style>
@@ -34,11 +34,18 @@
   <body>
     <form method="post" action="/login">
       <div class="logo big"></div>
-      <div class="brandname neon-soft">Control panel</div>
-      <div class="hint">Operator access. Find the token in your private <code>data/secrets.json</code> file, or use the CONTROL_TOKEN you configured. Keep it private.</div>
-      <input type="password" name="token" placeholder="Control token" autofocus autocomplete="current-password" />
-      <button class="btn primary" type="submit">Unlock</button>
-      <div class="hint" id="bad" hidden style="color: #ff9aab">Wrong token.</div>
+      <div class="brandname neon-soft">Wheel dashboard</div>
+      <div class="hint">
+        Open the sign-in link you were given, or paste your dashboard code here. You stay signed in on this
+        browser for a year.
+      </div>
+      <input type="password" name="token" placeholder="Dashboard code" aria-label="Dashboard code" autofocus autocomplete="current-password" />
+      <button class="btn primary" type="submit">Open dashboard</button>
+      <div class="hint" id="bad" hidden style="color: #ff9aab">That code didn’t work. Check it and try again.</div>
+      <div class="hint">
+        Running the wheel yourself? In the wheel’s folder run <code>npm run dashboard-link</code> to get a one-click
+        sign-in link.
+      </div>
     </form>
     <script>
       if (new URLSearchParams(location.search).has("bad")) document.getElementById("bad").hidden = false;

@@ -9,6 +9,7 @@
 //   title=0      hide the title above the wheel
 //   idle=hide    keep the wheel hidden until a spin starts
 //   autohide=7   seconds the winner card stays up (0 = stay until the next spin)
+import { applyLogo } from "./brand.js";
 import { createBubbles } from "./bubbles.js";
 import { connect } from "./net.js";
 import { createWheel } from "./wheel.js";
@@ -53,6 +54,7 @@ function apply(next) {
   wheel.setPointer(state.settings.pointer);
   wheel.setEntries(state.entries);
   if (!wheel.isSpinning()) wheel.setAngle(state.angle);
+  applyLogo(state.logo, wheel);
 
   const showTitle = showTitleParam && state.overlay.showTitle !== false;
   $("ovTitle").textContent = state.title;

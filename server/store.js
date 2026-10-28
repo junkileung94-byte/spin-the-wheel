@@ -7,12 +7,13 @@ import { fileURLToPath } from "node:url";
 
 // DATA_DIR is overridable so the end-to-end test can boot a throwaway server without
 // trampling the live wheel.
-const DATA_DIR =
+// Resolved on use, not at import, so a .env loaded by server/index.js still applies.
+const dataDir = () =>
   process.env.DATA_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data");
 
 function read(name, fallback) {
   try {
-    return JSON.parse(fs.readFileSync(path.join(DATA_DIR, name), "utf8"));
+    return JSON.parse(fs.readFileSync(path.join(dataDir(), name), "utf8"));
   } catch {
     return fallback;
   }
@@ -25,8 +26,8 @@ function write(name, value) {
   const timer = setTimeout(() => {
     pending.delete(name);
     try {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-      const target = path.join(DATA_DIR, name);
+      fs.mkdirSync(dataDir(), { recursive: true });
+      const target = path.join(dataDir(), name);
       const tmp = `${target}.tmp`;
       fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
       fs.renameSync(tmp, target);
@@ -42,13 +43,15 @@ function write(name, value) {
 export function flush(all) {
   for (const [name, timer] of pending) clearTimeout(timer);
   pending.clear();
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.mkdirSync(dataDir(), { recursive: true });
   for (const [name, value] of Object.entries(all)) {
-    const target = path.join(DATA_DIR, name);
+    const target = path.join(dataDir(), name);
     fs.writeFileSync(`${target}.tmp`, JSON.stringify(value, null, 2));
     fs.renameSync(`${target}.tmp`, target);
   }
 }
+
+export { dataDir };
 
 export const store = {
   loadWheels: () => read("wheels.json", {}),

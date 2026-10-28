@@ -1,5 +1,25 @@
-/* Shared theme for the wheel, operator panel and OBS overlay.
-   Uses system fonts and a bundled SVG; no external assets are required. */
+/* Shared theme for the wheel, dashboard and OBS overlay.
+   Bundled Quicksand font (SIL OFL, see /fonts/OFL.txt); no external assets are required.
+   The logo is uploaded from the dashboard and served at /api/logo. */
+
+@font-face {
+  font-family: "Quicksand";
+  src: url("/fonts/Quicksand-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Quicksand";
+  src: url("/fonts/Quicksand-Medium.ttf") format("truetype");
+  font-weight: 500 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Quicksand";
+  src: url("/fonts/Quicksand-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
 
 :root {
   /* surfaces — the deep-water end of the kit */
@@ -40,8 +60,8 @@
   --k-radius: 14px;
   --k-radius-lg: 22px;
 
-  --k-font: "Trebuchet MS", system-ui, sans-serif;
-  --k-logo: url("/assets/wheel.svg");
+  --k-font: "Quicksand", "Trebuchet MS", system-ui, sans-serif;
+  --k-logo: url("/api/logo");
 }
 
 /* Neon text, the one effect the whole kit is built on. */

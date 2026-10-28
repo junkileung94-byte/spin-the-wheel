@@ -1,0 +1,556 @@
+/* Dashboard (/control). Live preview + spin on the left, everything editable on the right.
+   On a phone the two columns stack. */
+
+body.dash {
+  overflow: auto;
+}
+
+body.dash .shell {
+  height: auto;
+  min-height: 100%;
+}
+
+body.dash .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-wrap: wrap;
+}
+
+.dash-main {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.1fr);
+  gap: 22px;
+  padding: 20px;
+  width: min(100%, 1400px);
+  margin: 0 auto;
+  align-items: start;
+}
+
+.dash-live {
+  position: sticky;
+  top: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.preview {
+  width: min(100%, 62vh);
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+
+.preview canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.dash-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: rgba(20, 16, 58, 0.62);
+  border: 1px solid var(--k-line);
+  border-radius: var(--k-radius-lg);
+  padding: 18px;
+  backdrop-filter: blur(10px);
+  min-width: 0;
+}
+
+.dash-panel .tabs {
+  flex-wrap: wrap;
+}
+
+.dash-panel .tab {
+  font-size: 14px;
+  padding: 10px 8px;
+  min-width: 110px;
+}
+
+.dash-panel .tabpanel {
+  gap: 14px;
+}
+
+.dash-panel h2 {
+  margin: 6px 0 0;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--k-ink-faint);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.section-head h2 {
+  margin: 0;
+}
+
+.center {
+  text-align: center;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.callout {
+  border: 1px solid rgba(79, 216, 255, 0.35);
+  background: rgba(79, 216, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  color: var(--k-ink-dim);
+}
+
+input[type="number"] {
+  width: 100%;
+  background: rgba(7, 6, 26, 0.72);
+  border: 1px solid var(--k-line);
+  border-radius: 12px;
+  padding: 11px 12px;
+  outline: none;
+}
+
+body.dash label.check {
+  font-size: 14.5px;
+  line-height: 1.4;
+}
+
+/* the default checkbox renders as a bright white slab on this dark ground */
+body.dash input[type="checkbox"] {
+  appearance: none;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 2px solid var(--k-line);
+  background: rgba(7, 6, 26, 0.72);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  margin: 0;
+}
+
+body.dash input[type="checkbox"]:checked {
+  background: linear-gradient(180deg, var(--k-accent-hot), var(--k-accent));
+  border-color: transparent;
+  box-shadow: var(--k-glow-soft);
+}
+
+body.dash input[type="checkbox"]:checked::after {
+  content: "✓";
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* ── banner: who wins next ─────────────────────────────────────────── */
+
+.banner {
+  border-radius: 18px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 2px solid var(--k-line);
+  background: rgba(20, 16, 58, 0.7);
+}
+
+.banner .who {
+  flex: 1;
+  min-width: 0;
+}
+
+.banner .kicker {
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--k-ink-faint);
+}
+
+.banner .headline {
+  font-size: clamp(18px, 2.2vw, 24px);
+  font-weight: 700;
+  line-height: 1.25;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.banner.picked {
+  border-color: var(--k-accent);
+  background: linear-gradient(180deg, rgba(255, 47, 208, 0.24), rgba(20, 16, 58, 0.7));
+  box-shadow: var(--k-glow);
+}
+
+.banner.won {
+  border-color: var(--k-gold);
+  background: linear-gradient(180deg, rgba(255, 215, 111, 0.22), rgba(20, 16, 58, 0.7));
+  box-shadow: 0 0 26px rgba(255, 215, 111, 0.35);
+}
+
+#makeRandom {
+  display: none;
+  flex: none;
+}
+
+.banner.picked #makeRandom {
+  display: block;
+}
+
+.spin {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 22px;
+  border-radius: 18px;
+  width: 100%;
+}
+
+.spin:disabled {
+  filter: grayscale(0.6);
+}
+
+.duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.duo .btn {
+  padding: 13px;
+}
+
+.btn.on {
+  border-color: var(--k-accent);
+  background: rgba(255, 47, 208, 0.18);
+}
+
+/* ── entry editor ──────────────────────────────────────────────────── */
+
+.entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: 26px 38px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.entry .num {
+  font-size: 12px;
+  color: var(--k-ink-faint);
+  text-align: right;
+}
+
+.entry input[type="color"] {
+  width: 38px;
+  height: 34px;
+  padding: 0;
+  border: 2px solid var(--k-line);
+  border-radius: 9px;
+  background: none;
+  cursor: pointer;
+}
+
+.entry input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.entry input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 6px;
+}
+
+.entry input[type="text"] {
+  padding: 8px 10px;
+  border-radius: 9px;
+}
+
+.entry .tools {
+  display: flex;
+  gap: 4px;
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+}
+
+.entry-list.locked {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.bulk {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bulk textarea {
+  height: 200px;
+  line-height: 1.6;
+}
+
+#addForm input,
+#saveForm input {
+  flex: 1;
+}
+
+.logo.big {
+  width: 84px;
+  height: 84px;
+  border-radius: 16px;
+  background-color: rgba(7, 6, 26, 0.5);
+}
+
+.logo-row {
+  align-items: center;
+  gap: 16px;
+}
+
+/* ── pick a winner ─────────────────────────────────────────────────── */
+
+.names {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.name {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--k-ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: transform 0.08s ease, background 0.15s ease;
+}
+
+.name:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.name:active {
+  transform: scale(0.98);
+}
+
+.name .bar {
+  width: 7px;
+  align-self: stretch;
+  border-radius: 7px;
+  flex: none;
+}
+
+.name .txt {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.name .mark {
+  font-size: 20px;
+  opacity: 0;
+  flex: none;
+}
+
+.name.chosen {
+  border-color: var(--k-accent);
+  background: rgba(255, 47, 208, 0.2);
+  box-shadow: var(--k-glow);
+}
+
+.name.chosen .mark {
+  opacity: 1;
+}
+
+.name .qpos {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(123, 47, 247, 0.4);
+  border: 1px solid rgba(192, 79, 240, 0.55);
+}
+
+.name.never {
+  opacity: 0.45;
+}
+
+.name.never .txt {
+  text-decoration: line-through;
+}
+
+.advblock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--k-line);
+}
+
+.advblock h3 {
+  font-size: 12.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--k-ink-faint);
+  margin: 6px 0 0;
+}
+
+.advrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.advrow input[type="number"] {
+  padding: 7px 9px;
+  border-radius: 9px;
+}
+
+.queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.qchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(123, 47, 247, 0.3);
+  border: 1px solid rgba(192, 79, 240, 0.5);
+  font-size: 14px;
+}
+
+.qchip button {
+  background: none;
+  border: 0;
+  color: var(--k-ink-dim);
+  cursor: pointer;
+  font-size: 15px;
+  padding: 0;
+}
+
+/* ── stream ────────────────────────────────────────────────────────── */
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 14px;
+  color: var(--k-ink-dim);
+}
+
+.step > b:first-child {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 47, 208, 0.25);
+  color: #fff;
+  font-size: 13px;
+}
+
+.mono {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+  color: var(--k-ink-dim);
+  background: rgba(7, 6, 26, 0.6);
+  border: 1px solid var(--k-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.tag {
+  color: #ff8ae8;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+#historyList,
+#wheelList {
+  flex: none;
+  max-height: 60vh;
+}
+
+@media (max-width: 980px) {
+  .dash-main {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+  .dash-live {
+    position: static;
+  }
+  .preview {
+    width: min(100%, 420px);
+  }
+}
+
+@media (max-width: 520px) {
+  .banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dash-panel .tab {
+    min-width: 0;
+    flex: 1 1 40%;
+  }
+  .entry {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+  }
+  .entry .num {
+    display: none;
+  }
+}

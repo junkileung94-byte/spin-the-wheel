@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY server ./server
 COPY public ./public
+COPY scripts ./scripts
 RUN mkdir -p /app/data && chown node:node /app/data
 USER node
 EXPOSE 21030

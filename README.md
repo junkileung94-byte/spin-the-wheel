@@ -1,14 +1,14 @@
 # Spin the Wheel
 
-A self-hosted wheel for streams, game nights and choosing from a list. Runs on your own computer with Node.js or Docker. Includes a transparent OBS overlay, saved wheels, spin history, sound effects and a separate operator panel.
+A self-hosted wheel for streams, game nights and choosing from a list. Runs on your own computer with Node.js or Docker. Includes a dashboard to edit and run the wheel, a transparent OBS overlay, saved wheels, spin history, sound effects and your own logo.
 
-**Private use only:** anyone who can reach the main page can change entries, settings and saved wheels, and start spins. The operator token only protects the advanced controls. Keep the app on your computer or behind an authenticated private-network proxy. Do not port-forward it or expose it directly to the internet.
+**Private use only:** anyone who can reach the main page can change entries, settings and saved wheels, and start spins. The dashboard sign-in only protects the dashboard (winner picking, logo, OBS link). Keep the app on your computer or behind an authenticated private-network proxy. Do not port-forward it or expose it directly to the internet.
 
-**Outcome controls:** the operator panel supports forced results, queues, weights and exclusions. Those settings are not shown on the main wheel or overlay. Disclose controlled outcomes to participants. This is not a certified random draw or a tool for regulated prize draws.
+**Outcome controls:** the dashboard supports forced results, queues, weights and exclusions. Those settings are not shown on the main wheel or overlay. Disclose controlled outcomes to participants. This is not a certified random draw or a tool for regulated prize draws.
 
 ## Option 1: run with Node.js
 
-Works with Node.js **22.9 or newer**. Node.js 22 and 24 are the CI targets. No database, paid service or build step is needed.
+Use Node.js **22 or newer** (22 and 24 are tested in CI; it also starts on 18.19+). No database, paid service or build step is needed.
 
 1. Install Node.js from <https://nodejs.org/>. Confirm `node --version` and `npm --version` work in a new terminal.
 2. On this repository's GitHub page, choose **Code > Download ZIP**, then extract the folder. Alternatively, clone the repository with Git.
@@ -19,13 +19,14 @@ Works with Node.js **22.9 or newer**. Node.js 22 and 24 are the CI targets. No d
    npm start
    ```
 
-4. Open <http://127.0.0.1:21030> in your browser. Keep the terminal running. Press **Ctrl+C** to stop the server and flush pending changes to disk.
+4. The terminal prints two addresses: the **wheel** (<http://127.0.0.1:21030>) and the **dashboard** (<http://127.0.0.1:21030/control>). Keep the terminal running. Press **Ctrl+C** to stop the server and flush pending changes to disk.
+5. To sign in to the dashboard, open a second terminal in the same folder and run `npm run dashboard-link`. Open the link it prints. You stay signed in on that browser for a year. See [The dashboard](#the-dashboard).
 
 On Windows, open PowerShell in the extracted folder. If PowerShell blocks `npm.ps1`, use `npm.cmd ci --ignore-scripts` and `npm.cmd start` instead of changing your execution policy.
 
 ### Optional configuration
 
-Copy `.env.example` to `.env` with your file manager, then edit it before starting. `npm start` and `npm run dev` load `.env` automatically. Environment variables already set in your terminal take priority.
+Copy `.env.example` to `.env` with your file manager, then edit it before starting. The server loads `.env` from its folder automatically. Environment variables already set in your terminal take priority.
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
@@ -56,7 +57,25 @@ docker compose start --wait          # Start again
 
 To change the host port, add `HOST_PORT=21031` to `.env` and recreate the container with `docker compose up -d --wait`. Open port 21031 instead. The container still listens internally on 21030. The Node.js `.env` settings are not passed into the container by this Compose file.
 
-## Use the wheel
+## The dashboard
+
+The dashboard at `/control` is where you run the wheel. It shows a live copy of the wheel next to a big **SPIN THE WHEEL** button, plus five tabs:
+
+| Tab | What you can do |
+| --- | --- |
+| **Edit wheel** | Change the title. Add, rename, recolour, reorder and remove entries one by one, or paste a whole list. Shuffle, sort, new colours. Save the wheel by name and load it again later. |
+| **Pick winner** | Tap an entry to make it win the next spin, line up several winners, lock one in, change chances or stop an entry from winning. Nothing picked means every spin is random. |
+| **Look & sound** | Upload your logo (PNG, JPG, WebP or GIF), spin length, pointer position, removing winners, bubble burst, how long the winner popup stays on stream, sound and volume. |
+| **Stream (OBS)** | Copy the OBS link, preview the overlay, test the winner popup, show or hide the wheel and its title on stream. |
+| **History** | Recent winners, with entries you picked marked. |
+
+Shortcuts when no text box is selected: **Space** spins, **Esc** goes back to random, **1** to **9** pick that entry.
+
+**Signing in.** Run `npm run dashboard-link` in the wheel's folder (Docker: `docker compose exec wheel node scripts/dashboard-link.js`). It prints a one-click sign-in link for this computer. If the wheel is reached through another address, add it: `npm run dashboard-link -- https://my-pc.example.ts.net:21030`. Anyone with the link can use the dashboard, so send it only to the person running the wheel. You can also paste the code from `controlToken` in `data/secrets.json` on the sign-in page.
+
+## Use the wheel page
+
+The main page (`/`) has the wheel itself and a simpler editor. It has a **Dashboard** button in the top corner.
 
 1. In **Entries**, type one entry per line. You need at least two entries to spin.
 2. Click **SPIN**, or use the wheel's keyboard shortcuts after clicking the page. Browser sound may require an initial click.
@@ -65,13 +84,13 @@ To change the host port, add `HOST_PORT=21031` to `.env` and recreate the contai
 
 All tabs connected to one server share one wheel. A second independent wheel needs a separate server, port and data directory.
 
-## Operator panel and OBS
+## Credentials and OBS
 
-### Get operator access
+### Where the credentials live
 
-The first start generates `controlToken` and `overlayKey` in the private `data/secrets.json` file. They are not printed in server logs. Open the file locally in an editor, keep the values private, and paste `controlToken` into <http://127.0.0.1:21030/control> when prompted. If you set `CONTROL_TOKEN` yourself, use that value instead.
+The first start generates `controlToken` (dashboard sign-in) and `overlayKey` (OBS link) in the private `data/secrets.json` file. They are not printed in server logs. `npm run dashboard-link` reads the file for you. If you set `CONTROL_TOKEN` yourself, that value is used instead.
 
-For Docker, copy the credentials file to your own machine without printing it in logs:
+For Docker, you can also copy the credentials file to your own machine without printing it in logs:
 
 ```sh
 docker compose cp wheel:/app/data/secrets.json ./operator-secrets.json
@@ -81,16 +100,16 @@ Open that local file in an editor. Keep it private and out of source control. On
 
 ### Add the OBS overlay
 
-1. Open the operator panel and copy the Browser Source URL from its overlay section. It contains a private overlay key.
-2. In OBS, add **Sources > Browser**. Paste the copied URL. Start with a width of **800** and height of **900**, then adjust for your layout.
+1. Open the dashboard's **Stream (OBS)** tab and click **Copy OBS link**. It contains a private overlay key. Tick "Only show the wheel on stream while it is spinning" first if you want that.
+2. In OBS, add **Sources > Browser**. Paste the copied link. Use a width of **1920** and height of **1080**, and untick "Shutdown source when not visible" and "Refresh browser when scene becomes active".
 3. Keep the server running. Use the wheel page to spin; OBS follows the same spin over WebSocket.
-4. Keep the operator panel and keyed URL out of your screen capture. The overlay key assigns a read-only WebSocket role; it is not an operator password or a privacy barrier for wheel contents. The main page and unkeyed display remain reachable by anyone with network access.
+4. Keep the dashboard and keyed URL out of your screen capture. The overlay key assigns a read-only WebSocket role; it is not an operator password or a privacy barrier for wheel contents. The main page and unkeyed display remain reachable by anyone with network access.
 
 The default URL works when OBS runs on the same computer. For another computer, use an authenticated private connection that both browsers and OBS can reach. `127.0.0.1` on another device points to that device, not your server. Do not solve this by publicly forwarding the app's port.
 
 ## Save, back up and restore
 
-The private data directory holds entries/settings (`state.json`), saved wheels (`wheels.json`), recent history (`history.json`), operator outcome settings (`rig.json`) and credentials (`secrets.json`). Back up the whole directory, not just the wheel list. Files appear as their features are used or when the app shuts down.
+The private data directory holds entries/settings (`state.json`), saved wheels (`wheels.json`), recent history (`history.json`), winner-picking settings (`rig.json`), your logo (`logo.png` or similar) and credentials (`secrets.json`). Back up the whole directory, not just the wheel list. Files appear as their features are used or when the app shuts down.
 
 **Node.js:** stop with Ctrl+C, copy the entire `data/` directory to a private backup location, then start again. To restore, stop the server, preserve the current directory, replace it with your backup and start again. Use your custom `DATA_DIR` if configured.
 
@@ -125,8 +144,9 @@ For Node.js, stop the app, run `npm ci --ignore-scripts`, then `npm start`. For 
 | --- | --- |
 | Address already in use | Stop the other copy, or change Node's `PORT` / Docker's `HOST_PORT`. |
 | Page stays on “connecting” | Check that the server is running. A proxy must support WebSocket upgrades at `/ws`. |
-| Overlay is blank | Use the complete keyed URL from the operator panel. Check the overlay is visible in its controls. |
-| Wrong operator token | Use `controlToken`, not `overlayKey`; check whether `CONTROL_TOKEN` overrides the file. |
+| Overlay is blank | Use the complete link from **Copy OBS link**. Check "Wheel visible on stream" in the dashboard. |
+| Dashboard asks for a code | Run `npm run dashboard-link` and open the link, or paste `controlToken` (not `overlayKey`). Check whether `CONTROL_TOKEN` overrides the file. |
+| Logo upload fails | Use PNG, JPG, WebP or GIF. Large images are shrunk in the browser before upload. |
 | Data disappears after restart | Check the data path, Docker volume and write permissions. Avoid changing Compose project folders without migrating data. |
 | No sound | Click the page first, enable sound and check browser/OBS audio settings. |
 
@@ -145,4 +165,4 @@ Tests use disposable data, not the running wheel. CI exercises Node.js 22/24 on 
 
 The app is a single Node.js process using Express, WebSockets and JSON files. It is not a multi-user SaaS service. Run one process per data directory. The main editor has no login or per-user permissions. Any reverse proxy must authenticate access to the **entire app**, including static pages, API and WebSocket routes. Use HTTPS outside loopback, keep dependencies current and treat all data backups as private.
 
-For customization, edit `public/css/theme.css` and replace `public/assets/wheel.svg` with your own artwork. The app uses system fonts and bundled artwork.
+To change colours, edit `public/css/theme.css`. Upload your logo from the dashboard rather than editing files. The bundled Quicksand font is licensed under the SIL Open Font License (`public/fonts/OFL.txt`).

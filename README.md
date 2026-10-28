@@ -2,7 +2,7 @@
 
 A self-hosted wheel for streams, game nights and choosing from a list. Runs on your own computer with Node.js or Docker. Includes a dashboard to edit and run the wheel, a transparent OBS overlay, saved wheels, spin history, sound effects and your own logo.
 
-**Private use only:** anyone who can reach the main page can change entries, settings and saved wheels, and start spins. The dashboard sign-in only protects the dashboard (winner picking, logo, OBS link). Keep the app on your computer or behind an authenticated private-network proxy. Do not port-forward it or expose it directly to the internet.
+**Private use only.** There is no sign-in: anyone who can reach the app can use the dashboard, including winner picking, the logo and the OBS link. That is fine on your own computer or a private tailnet. Do not port-forward it or expose it directly to the internet. If you need it on a network you do not fully trust, put it behind an authenticated reverse proxy that covers every page, API route and WebSocket.
 
 **Outcome controls:** the dashboard supports forced results, queues, weights and exclusions. Those settings are not shown on the main wheel or overlay. Disclose controlled outcomes to participants. This is not a certified random draw or a tool for regulated prize draws.
 
@@ -19,8 +19,7 @@ Use Node.js **22 or newer** (22 and 24 are tested in CI; it also starts on 18.19
    npm start
    ```
 
-4. The terminal prints two addresses: the **wheel** (<http://127.0.0.1:21030>) and the **dashboard** (<http://127.0.0.1:21030/control>). Keep the terminal running. Press **Ctrl+C** to stop the server and flush pending changes to disk.
-5. To sign in to the dashboard, open a second terminal in the same folder and run `npm run dashboard-link`. Open the link it prints. You stay signed in on that browser for a year. See [The dashboard](#the-dashboard).
+4. The terminal prints two addresses: the **wheel** (<http://127.0.0.1:21030>) and the **dashboard** (<http://127.0.0.1:21030/control>). Both open directly; there is nothing to sign in to. Keep the terminal running. Press **Ctrl+C** to stop the server and flush pending changes to disk. See [The dashboard](#the-dashboard).
 
 On Windows, open PowerShell in the extracted folder. If PowerShell blocks `npm.ps1`, use `npm.cmd ci --ignore-scripts` and `npm.cmd start` instead of changing your execution policy.
 
@@ -33,8 +32,7 @@ Copy `.env.example` to `.env` with your file manager, then edit it before starti
 | `PORT` | `21030` | HTTP and WebSocket port |
 | `BIND` | `127.0.0.1` | Listen only on this computer |
 | `DATA_DIR` | `data` beside the server's project folder | Persistent JSON storage; use an absolute path to override |
-| `CONTROL_TOKEN` | Generated on first start | Optional operator credential override |
-| `OVERLAY_KEY` | Generated on first start | Optional OBS credential override |
+| `OVERLAY_KEY` | Generated on first start | Optional OBS link key override |
 
 If you change `PORT`, use that port in all browser and OBS URLs. Keep custom data directories outside `public/`. Never commit `.env`, credentials, backups or your data folder.
 
@@ -71,8 +69,6 @@ The dashboard at `/control` is where you run the wheel. It shows a live copy of 
 
 Shortcuts when no text box is selected: **Space** spins, **Esc** goes back to random, **1** to **9** pick that entry.
 
-**Signing in.** Run `npm run dashboard-link` in the wheel's folder (Docker: `docker compose exec wheel node scripts/dashboard-link.js`). It prints a one-click sign-in link for this computer. If the wheel is reached through another address, add it: `npm run dashboard-link -- https://my-pc.example.ts.net:21030`. Anyone with the link can use the dashboard, so send it only to the person running the wheel. You can also paste the code from `controlToken` in `data/secrets.json` on the sign-in page.
-
 ## Use the wheel page
 
 The main page (`/`) has the wheel itself and a simpler editor. It has a **Dashboard** button in the top corner.
@@ -84,17 +80,9 @@ The main page (`/`) has the wheel itself and a simpler editor. It has a **Dashbo
 
 All tabs connected to one server share one wheel. A second independent wheel needs a separate server, port and data directory.
 
-## Credentials and OBS
+## The OBS link
 
-### Where the credentials live
-
-The first start generates `controlToken` (dashboard sign-in) and `overlayKey` (OBS link) in the private `data/secrets.json` file. They are not printed in server logs. `npm run dashboard-link` reads the file for you. If you set `CONTROL_TOKEN` yourself, that value is used instead.
-
-For Docker, you can also copy the credentials file to your own machine without printing it in logs:
-
-```sh
-docker compose cp wheel:/app/data/secrets.json ./operator-secrets.json
-```
+The first start generates an `overlayKey` in the private `data/secrets.json` file so your OBS Browser Source URL keeps working across restarts. It is not printed in server logs. If you set `OVERLAY_KEY` yourself, that value is used instead.
 
 Open that local file in an editor. Keep it private and out of source control. On shared machines, restrict access using your operating system's file permissions. Remove your temporary copy when you no longer need it.
 
@@ -103,13 +91,13 @@ Open that local file in an editor. Keep it private and out of source control. On
 1. Open the dashboard's **Stream (OBS)** tab and click **Copy OBS link**. It contains a private overlay key. Tick "Only show the wheel on stream while it is spinning" first if you want that.
 2. In OBS, add **Sources > Browser**. Paste the copied link. Use a width of **1920** and height of **1080**, and untick "Shutdown source when not visible" and "Refresh browser when scene becomes active".
 3. Keep the server running. Use the wheel page to spin; OBS follows the same spin over WebSocket.
-4. Keep the dashboard and keyed URL out of your screen capture. The overlay key assigns a read-only WebSocket role; it is not an operator password or a privacy barrier for wheel contents. The main page and unkeyed display remain reachable by anyone with network access.
+4. Keep the dashboard and the keyed URL out of your screen capture. The overlay key just assigns the overlay its read-only WebSocket role; it is not a password and does not hide the wheel's contents.
 
 The default URL works when OBS runs on the same computer. For another computer, use an authenticated private connection that both browsers and OBS can reach. `127.0.0.1` on another device points to that device, not your server. Do not solve this by publicly forwarding the app's port.
 
 ## Save, back up and restore
 
-The private data directory holds entries/settings (`state.json`), saved wheels (`wheels.json`), recent history (`history.json`), winner-picking settings (`rig.json`), your logo (`logo.png` or similar) and credentials (`secrets.json`). Back up the whole directory, not just the wheel list. Files appear as their features are used or when the app shuts down.
+The private data directory holds entries/settings (`state.json`), saved wheels (`wheels.json`), recent history (`history.json`), winner-picking settings (`rig.json`), your logo (`logo.png` or similar) and the OBS link key (`secrets.json`). Back up the whole directory, not just the wheel list. Files appear as their features are used or when the app shuts down.
 
 **Node.js:** stop with Ctrl+C, copy the entire `data/` directory to a private backup location, then start again. To restore, stop the server, preserve the current directory, replace it with your backup and start again. Use your custom `DATA_DIR` if configured.
 
@@ -130,7 +118,7 @@ docker compose run --rm --no-deps --user root wheel chown -R node:node /app/data
 docker compose start --wait
 ```
 
-Use a complete backup from this app and keep the backup private. Restoring credentials restores the old operator login and OBS URL. Do not remove the Docker data volume when updating or rebuilding.
+Use a complete backup from this app and keep the backup private. Restoring the credentials file restores the old OBS URL. Do not remove the Docker data volume when updating or rebuilding.
 
 ## Updates
 
@@ -145,7 +133,6 @@ For Node.js, stop the app, run `npm ci --ignore-scripts`, then `npm start`. For 
 | Address already in use | Stop the other copy, or change Node's `PORT` / Docker's `HOST_PORT`. |
 | Page stays on “connecting” | Check that the server is running. A proxy must support WebSocket upgrades at `/ws`. |
 | Overlay is blank | Use the complete link from **Copy OBS link**. Check "Wheel visible on stream" in the dashboard. |
-| Dashboard asks for a code | Run `npm run dashboard-link` and open the link, or paste `controlToken` (not `overlayKey`). Check whether `CONTROL_TOKEN` overrides the file. |
 | Logo upload fails | Use PNG, JPG, WebP or GIF. Large images are shrunk in the browser before upload. |
 | Data disappears after restart | Check the data path, Docker volume and write permissions. Avoid changing Compose project folders without migrating data. |
 | No sound | Click the wheel page once (browsers block sound until a click), check **Sound effects** and the volume. For sound from OBS, tick **Play the sounds in the OBS overlay** and tick "Control audio via OBS" on the browser source. |
@@ -163,6 +150,6 @@ npm run dev
 
 Tests use disposable data, not the running wheel. CI exercises Node.js 22/24 on Linux, macOS and Windows, plus a Docker startup check. Inspect each run's actual result before treating a platform as verified.
 
-The app is a single Node.js process using Express, WebSockets and JSON files. It is not a multi-user SaaS service. Run one process per data directory. The main editor has no login or per-user permissions. Any reverse proxy must authenticate access to the **entire app**, including static pages, API and WebSocket routes. Use HTTPS outside loopback, keep dependencies current and treat all data backups as private.
+The app is a single Node.js process using Express, WebSockets and JSON files. It is not a multi-user SaaS service. Run one process per data directory. Nothing in the app authenticates users; isolation comes entirely from where you run it. Any reverse proxy must authenticate access to the **entire app**, including static pages, API and WebSocket routes. Use HTTPS outside loopback, keep dependencies current and treat all data backups as private.
 
 The sound effects in `public/sounds/` were generated with Higgsfield; see `public/sounds/CREDITS.md` to swap in your own. To change colours, edit `public/css/theme.css`. Upload your logo from the dashboard rather than editing files. The bundled Quicksand font is licensed under the SIL Open Font License (`public/fonts/OFL.txt`).

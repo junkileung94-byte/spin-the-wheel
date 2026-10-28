@@ -9,8 +9,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node --test",
-    "dashboard-link": "node scripts/dashboard-link.js"
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18.19.0"

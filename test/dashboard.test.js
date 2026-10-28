@@ -1,5 +1,5 @@
-// Dashboard plumbing: one-click sign-in, the logo upload, and the pages the dashboard
-// needs. Boots a throwaway server on a free port with its own data directory.
+// Dashboard plumbing: open access, the logo upload, and the pages the dashboard needs.
+// Boots a throwaway server on a free port with its own data directory.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -13,7 +13,6 @@ import { fileURLToPath } from "node:url";
 import { WebSocket } from "ws";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
-const TOKEN = "dash-test-token";
 
 // 1x1 transparent PNG
 const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
@@ -27,9 +26,9 @@ async function freePort() {
   return port;
 }
 
-function welcome(base, headers = {}) {
+function welcome(base, query = "") {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`${base.replace("http:", "ws:")}/ws`, { headers });
+    const ws = new WebSocket(`${base.replace("http:", "ws:")}/ws${query}`);
     ws.once("message", (raw) => {
       ws.close();
       resolve(JSON.parse(raw));
@@ -38,13 +37,13 @@ function welcome(base, headers = {}) {
   });
 }
 
-test("dashboard sign-in link, logo upload and pages", { timeout: 20000 }, async (t) => {
+test("dashboard opens without sign-in; logo upload and sound assets", { timeout: 20000 }, async (t) => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "wheel-dash-"));
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ["server/index.js"], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(port), BIND: "127.0.0.1", DATA_DIR: data, CONTROL_TOKEN: TOKEN, OVERLAY_KEY: "k" },
+    env: { ...process.env, PORT: String(port), BIND: "127.0.0.1", DATA_DIR: data, OVERLAY_KEY: "k" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
@@ -70,30 +69,20 @@ test("dashboard sign-in link, logo upload and pages", { timeout: 20000 }, async 
   }
 
   assert.ok(output.includes("/control"), "startup output points to the dashboard");
-  assert.ok(!output.includes(TOKEN), "startup output never prints the token");
+  assert.ok(!output.includes("k"), "startup output never prints the overlay key");
 
-  // a wrong link falls back to the sign-in page, a right one signs in and redirects
-  const bad = await fetch(`${base}/login?token=nope`, { redirect: "manual" });
-  assert.equal(bad.status, 200);
-  assert.equal(bad.headers.get("set-cookie"), null);
-  const good = await fetch(`${base}/login?token=${TOKEN}`, { redirect: "manual" });
-  assert.equal(good.status, 302);
-  assert.equal(good.headers.get("location"), "/control");
-  const cookie = good.headers.get("set-cookie").split(";")[0];
-  assert.ok(cookie.startsWith("ks_control="));
-
+  // no sign-in: the dashboard opens directly, and the sign-in machinery is gone
   for (const route of ["/control", "/dashboard"]) {
-    const page = await fetch(base + route, { headers: { Cookie: cookie }, redirect: "manual" });
-    assert.equal(page.status, 200, `${route} opens when signed in`);
+    const page = await fetch(base + route);
+    assert.equal(page.status, 200, `${route} opens without signing in`);
     assert.match(await page.text(), /Edit wheel/);
-    assert.equal((await fetch(base + route, { redirect: "manual" })).status, 302, `${route} needs sign-in`);
   }
-  const sounds = ["spin", "tick", "tick2", "win", "bubbles", "pop1", "pop2", "pop3", "pop4"].map((n) => `/sounds/${n}.wav`);
-  for (const asset of ["/css/dashboard.css", "/js/control.js", "/js/brand.js", "/js/sound.js", "/fonts/Quicksand-Bold.ttf", ...sounds]) {
+  assert.equal((await fetch(base + "/login")).status, 404, "no login page anymore");
+  for (const asset of ["/css/dashboard.css", "/js/control.js", "/js/brand.js", "/js/sound.js", "/fonts/Quicksand-Bold.ttf"]) {
     assert.equal((await fetch(base + asset)).status, 200, `asset reachable: ${asset}`);
   }
 
-  // every sound is a real WAV file
+  const sounds = ["spin", "tick", "tick2", "win", "bubbles", "pop1", "pop2", "pop3", "pop4"].map((n) => `/sounds/${n}.wav`);
   for (const s of sounds) {
     const head = Buffer.from(await (await fetch(base + s)).arrayBuffer()).subarray(0, 12).toString("latin1");
     assert.ok(head.startsWith("RIFF") && head.endsWith("WAVE"), `${s} is a WAV file`);
@@ -108,28 +97,27 @@ test("dashboard sign-in link, logo upload and pages", { timeout: 20000 }, async 
   assert.match(before.headers.get("content-type"), /svg/);
   assert.equal((await welcome(base)).state.logo, 0);
 
-  const upload = (body, headers = {}) =>
-    fetch(`${base}/api/logo`, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body });
+  const upload = (body) =>
+    fetch(`${base}/api/logo`, { method: "POST", headers: { "Content-Type": "application/json" }, body });
 
-  assert.equal((await upload(JSON.stringify({ dataUrl: `data:image/png;base64,${PNG}` }))).status, 401, "public cannot upload");
-  const svg = await upload(JSON.stringify({ dataUrl: "data:image/svg+xml;base64,PHN2Zy8+" }), { Cookie: cookie });
+  const svg = await upload(JSON.stringify({ dataUrl: "data:image/svg+xml;base64,PHN2Zy8+" }));
   assert.equal(svg.status, 400, "SVG uploads are refused");
-  const big = await upload(JSON.stringify({ dataUrl: `data:image/png;base64,${"A".repeat(2_900_000)}` }), { Cookie: cookie });
+  const big = await upload(JSON.stringify({ dataUrl: `data:image/png;base64,${"A".repeat(2_900_000)}` }));
   assert.equal(big.status, 400, "oversized images are refused");
 
-  const ok = await upload(JSON.stringify({ dataUrl: `data:image/png;base64,${PNG}` }), { Cookie: cookie });
+  const ok = await upload(JSON.stringify({ dataUrl: `data:image/png;base64,${PNG}` }));
   assert.equal(ok.status, 200);
   const after = await fetch(`${base}/api/logo`);
   assert.match(after.headers.get("content-type"), /png/);
   assert.ok(fs.existsSync(path.join(data, "logo.png")), "logo is stored in the data directory");
   assert.ok((await welcome(base)).state.logo > 0, "state carries the new logo version");
 
-  assert.equal((await fetch(`${base}/api/logo`, { method: "DELETE" })).status, 401);
-  assert.equal((await fetch(`${base}/api/logo`, { method: "DELETE", headers: { Cookie: cookie } })).status, 200);
+  assert.equal((await fetch(`${base}/api/logo`, { method: "DELETE" })).status, 200);
   assert.ok(!fs.existsSync(path.join(data, "logo.png")));
   assert.equal((await welcome(base)).state.logo, 0);
 
-  const out = await fetch(`${base}/logout`, { redirect: "manual", headers: { Cookie: cookie } });
-  assert.equal(out.status, 302);
-  assert.match(out.headers.get("set-cookie"), /Max-Age=0/);
+  // the keyed overlay stays a display: its snapshot carries no operator data
+  const keyed = await welcome(base, "?key=k");
+  assert.equal(keyed.role, "overlay");
+  assert.ok(!keyed.state.rig && !keyed.state.overlayKey, "overlay state omits operator data");
 });

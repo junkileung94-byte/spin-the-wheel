@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import express from "express";
 
-import { COOKIE, createAuth, parseCookies } from "./auth.js";
+import { createAuth } from "./auth.js";
 import { createBus } from "./bus.js";
 import { createRig } from "./rig.js";
 import { indexAt, norm, planSpin, POINTER_ANGLE, TAU } from "./spin.js";
@@ -41,7 +41,7 @@ const PORT = Number(process.env.PORT || 21030);
 const BIND = process.env.BIND || "127.0.0.1";
 const SPIN_LEAD_MS = Number(process.env.SPIN_LEAD_MS || 250);
 
-// Secrets survive restarts so OBS never needs its Browser Source URL re-pasted.
+// The overlay key survives restarts so OBS never needs its Browser Source URL re-pasted.
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
 const secretsPath = path.join(DATA_DIR, "secrets.json");
 let secrets = {};
@@ -50,20 +50,13 @@ try {
 } catch {
   secrets = {};
 }
-const need = (envName, key) => {
-  if (process.env[envName]) return process.env[envName];
-  if (!secrets[key]) {
-    secrets[key] = crypto.randomBytes(12).toString("base64url");
-    fs.mkdirSync(path.dirname(secretsPath), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(secretsPath, JSON.stringify(secrets, null, 2), { mode: 0o600 });
-    console.log(`[auth] generated ${envName}; stored in the private data directory`);
-  }
-  return secrets[key];
-};
-const auth = createAuth({
-  controlToken: need("CONTROL_TOKEN", "controlToken"),
-  overlayKey: need("OVERLAY_KEY", "overlayKey"),
-});
+if (!process.env.OVERLAY_KEY && !secrets.overlayKey) {
+  secrets.overlayKey = crypto.randomBytes(12).toString("base64url");
+  fs.mkdirSync(path.dirname(secretsPath), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(secretsPath, JSON.stringify(secrets, null, 2), { mode: 0o600 });
+  console.log("[auth] generated OVERLAY_KEY; stored in the private data directory");
+}
+const auth = createAuth({ overlayKey: process.env.OVERLAY_KEY || secrets.overlayKey });
 
 // ---------------------------------------------------------------- state
 
@@ -431,43 +424,11 @@ app.get("/api/health", (_req, res) =>
   res.json({ ok: true, entries: state.entries.length, spinning: Boolean(inflight) }),
 );
 
-const isControlReq = (req) => auth.isControl(parseCookies(req.headers.cookie || "")[COOKIE]);
+// No sign-in: the dashboard is open to whoever can reach the server, so the app must stay
+// on loopback or an authenticated private network.
+app.get(["/control", "/dashboard"], (_req, res) => res.sendFile(path.join(PUBLIC, "control.html")));
 
-const requireControl = (req, res, next) => {
-  if (isControlReq(req)) return next();
-  return res.redirect("/login");
-};
-
-const signIn = (res) => {
-  res.setHeader(
-    "Set-Cookie",
-    `${COOKIE}=${encodeURIComponent(auth.controlToken)}; Path=/; Max-Age=${60 * 60 * 24 * 365}; HttpOnly; SameSite=Lax`,
-  );
-  res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Referrer-Policy", "no-referrer");
-  return res.redirect("/control");
-};
-
-// The one-click sign-in link (`npm run dashboard-link`) carries the token once; the server
-// swaps it for the cookie and redirects so the token does not stay in the address bar.
-app.get("/login", (req, res) => {
-  if (typeof req.query.token === "string" && auth.isControl(req.query.token.trim())) return signIn(res);
-  return res.sendFile(path.join(PUBLIC, "login.html"));
-});
-
-app.post("/login", (req, res) => {
-  if (auth.isControl((req.body?.token || "").trim())) return signIn(res);
-  return res.redirect("/login?bad=1");
-});
-
-app.get("/logout", (_req, res) => {
-  res.setHeader("Set-Cookie", `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
-  return res.redirect("/login");
-});
-
-app.get(["/control", "/dashboard"], requireControl, (_req, res) =>
-  res.sendFile(path.join(PUBLIC, "control.html")),
-);
+app.get("/overlay", (_req, res) => res.sendFile(path.join(PUBLIC, "overlay.html")));
 
 app.get("/api/logo", (_req, res) => {
   const file = findLogo();
@@ -476,7 +437,7 @@ app.get("/api/logo", (_req, res) => {
   res.sendFile(file || path.join(PUBLIC, "assets", "wheel.svg"));
 });
 
-app.post("/api/logo", requireControlApi, express.json({ limit: "3mb" }), (req, res) => {
+app.post("/api/logo", express.json({ limit: "3mb" }), (req, res) => {
   const m = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body?.dataUrl || ""));
   const ext = m && LOGO_TYPES[m[1]];
   if (!ext) return res.status(400).json({ ok: false, error: "Use a PNG, JPG, WebP or GIF image." });
@@ -494,18 +455,12 @@ app.post("/api/logo", requireControlApi, express.json({ limit: "3mb" }), (req, r
   return res.json({ ok: true });
 });
 
-app.delete("/api/logo", requireControlApi, (_req, res) => {
+app.delete("/api/logo", (_req, res) => {
   removeLogos();
   state.logo = 0;
   pushState();
   return res.json({ ok: true });
 });
-
-function requireControlApi(req, res, next) {
-  if (isControlReq(req)) return next();
-  return res.status(401).json({ ok: false, error: "Sign in to the dashboard first." });
-}
-app.get("/overlay", (_req, res) => res.sendFile(path.join(PUBLIC, "overlay.html")));
 
 app.use(
   express.static(PUBLIC, {
@@ -521,7 +476,7 @@ server.listen(PORT, BIND, () => {
   const host = BIND === "0.0.0.0" || BIND === "::" ? "127.0.0.1" : BIND;
   console.log(`[spin-the-wheel] wheel:     http://${host}:${PORT}/`);
   console.log(`[spin-the-wheel] dashboard: http://${host}:${PORT}/control`);
-  console.log("[spin-the-wheel] one-click dashboard sign-in link: run `npm run dashboard-link` in this folder");
+  console.log("[spin-the-wheel] no sign-in: anyone who can reach this address can use the dashboard");
 });
 
 for (const sig of ["SIGINT", "SIGTERM"]) {

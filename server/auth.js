@@ -1,12 +1,10 @@
-// Two secrets, two jobs:
-//   CONTROL_TOKEN — unlocks /control (the operator panel that can rig outcomes)
-//   OVERLAY_KEY   — assigns the read-only overlay WebSocket role, not page privacy
+// One key, one job:
+//   OVERLAY_KEY — assigns the read-only overlay WebSocket role (keeps the OBS link stable
+//                  and stops a stray tab from counting as an operator page)
 //
-// The whole app is tailnet-only, so these guard against the wrong person on the tailnet
-// and against a URL leaking into a stream frame — not against the open internet.
+// There is no sign-in: the app is meant for loopback or a private tailnet, and anyone who
+// can reach it may use the dashboard. Do not expose it to the open internet.
 import crypto from "node:crypto";
-
-export const COOKIE = "ks_control";
 
 const safeEqual = (a, b) => {
   const ba = Buffer.from(String(a));
@@ -17,27 +15,13 @@ const safeEqual = (a, b) => {
   return crypto.timingSafeEqual(ha, hb);
 };
 
-export function parseCookies(header = "") {
-  const out = {};
-  for (const part of header.split(";")) {
-    const i = part.indexOf("=");
-    if (i < 0) continue;
-    out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
-  }
-  return out;
-}
-
-export function createAuth({ controlToken, overlayKey }) {
+export function createAuth({ overlayKey }) {
   return {
-    controlToken,
     overlayKey,
-    isControl: (token) => Boolean(token) && safeEqual(token, controlToken),
     isOverlay: (key) => Boolean(key) && safeEqual(key, overlayKey),
     /** Role for a websocket, decided server-side and never taken from the client. */
-    roleFor({ cookieHeader, key }) {
-      if (this.isControl(parseCookies(cookieHeader)[COOKIE])) return "control";
-      if (this.isOverlay(key)) return "overlay";
-      return "public";
+    roleFor({ key }) {
+      return this.isOverlay(key) ? "overlay" : "control";
     },
   };
 }

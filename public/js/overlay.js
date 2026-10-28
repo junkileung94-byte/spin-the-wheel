@@ -1,6 +1,6 @@
 // OBS Browser Source.
 //
-// A display, never an input: it sends nothing but clock pings. It renders the same wheel as
+// A display, never an input: its WebSocket role is read-only. It renders the same wheel as
 // the main page, driven by the same server timestamps, so the two stay frame-locked.
 //
 // URL params

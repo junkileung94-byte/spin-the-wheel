@@ -42,6 +42,9 @@ export function createWheel(canvas, opts = {}) {
   const ctx = canvas.getContext("2d");
   const logo = new Image();
   logo.src = opts.logo || "/api/logo";
+  // The logo's transparent padding is trimmed before drawing, so the artwork itself (not
+  // just its rectangle) sits dead-centre in the hub.
+  let logoBox = null; // { sx, sy, sw, sh } crop of the loaded image
 
   let entries = [];
   let rot = 0;
@@ -247,14 +250,14 @@ export function createWheel(canvas, opts = {}) {
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
     ctx.stroke();
 
-    if (logo.complete && logo.naturalWidth) {
-      // fit inside the hub without stretching non-square logos
+    if (logo.complete && logo.naturalWidth && logoBox) {
+      const { sx, sy, sw, sh } = logoBox;
       const d = hr * 1.62;
-      const k = d / Math.max(logo.naturalWidth, logo.naturalHeight);
-      const w = logo.naturalWidth * k;
-      const h = logo.naturalHeight * k;
+      const k = d / Math.max(sw, sh);
+      const w = sw * k;
+      const h = sh * k;
       ctx.globalAlpha = 0.96;
-      ctx.drawImage(logo, cx - w / 2, cy - h / 2, w, h);
+      ctx.drawImage(logo, sx, sy, sw, sh, cx - w / 2, cy - h / 2, w, h);
     }
     ctx.restore();
   }
@@ -366,6 +369,39 @@ export function createWheel(canvas, opts = {}) {
   window.addEventListener("resize", resize);
   logo.addEventListener("load", render);
   // canvas text does not trigger a web font download, so ask for it and redraw once it lands
+  const trimLogo = () => {
+    try {
+      const off = document.createElement("canvas");
+      off.width = logo.naturalWidth;
+      off.height = logo.naturalHeight;
+      const octx = off.getContext("2d", { willReadFrequently: true });
+      octx.drawImage(logo, 0, 0);
+      const { data } = octx.getImageData(0, 0, off.width, off.height);
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -1;
+      let maxY = -1;
+      for (let y = 0; y < off.height; y++) {
+        for (let x = 0; x < off.width; x++) {
+          if (data[(y * off.width + x) * 4 + 3] > 8) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < 0) logoBox = { sx: 0, sy: 0, sw: off.width, sh: off.height };
+      else logoBox = { sx: minX, sy: minY, sw: maxX - minX + 1, sh: maxY - minY + 1 };
+      render();
+    } catch {
+      logoBox = { sx: 0, sy: 0, sw: logo.naturalWidth, sh: logo.naturalHeight };
+      render();
+    }
+  };
+  logo.addEventListener("load", trimLogo);
+  if (logo.complete && logo.naturalWidth) queueMicrotask(trimLogo);
+
   document.fonts?.load('700 20px "Quicksand"').then(() => {
     layoutCache.clear(); // measured with the fallback font until now
     render();
@@ -388,7 +424,10 @@ export function createWheel(canvas, opts = {}) {
       render();
     },
     setLogo(src) {
-      if (src && logo.getAttribute("src") !== src) logo.src = src;
+      if (src && logo.getAttribute("src") !== src) {
+        logoBox = null;
+        logo.src = src; // trimLogo runs on load
+      }
     },
     getAngle: () => rot,
     isSpinning: () => Boolean(anim),

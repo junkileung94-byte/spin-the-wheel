@@ -23,7 +23,7 @@ test("fresh self-host loads .env, keeps credentials private and restores data af
   fs.writeFileSync(envFile, `PORT=${port}\nBIND=127.0.0.1\nDATA_DIR="${data.replaceAll("\\", "/")}"\n`);
   const base = `http://127.0.0.1:${port}`;
   const env = { ...process.env };
-  for (const key of ["PORT", "BIND", "DATA_DIR", "CONTROL_TOKEN", "OVERLAY_KEY"]) delete env[key];
+  for (const key of ["PORT", "BIND", "DATA_DIR", "OVERLAY_KEY"]) delete env[key];
   let child;
   let output = "";
   const stop = async () => {
@@ -55,7 +55,7 @@ test("fresh self-host loads .env, keeps credentials private and restores data af
   const secretFile = path.join(data, "secrets.json");
   const original = fs.readFileSync(secretFile);
   const secrets = JSON.parse(original);
-  assert.ok(secrets.controlToken && secrets.overlayKey, "credentials generated in configured directory");
+  assert.ok(secrets.overlayKey, "overlay key generated in the configured directory");
   if (process.platform !== "win32") {
     assert.equal(fs.statSync(secretFile).mode & 0o777, 0o600, "credential file is owner-only");
   }
@@ -65,14 +65,10 @@ test("fresh self-host loads .env, keeps credentials private and restores data af
   for (const route of ["/.env", "/data/secrets.json", "/server/index.js"]) {
     assert.equal((await fetch(base + route)).status, 404, `private path not served: ${route}`);
   }
-  assert.equal((await fetch(base + "/control", { redirect: "manual" })).status, 302);
-  const login = await fetch(base + "/login", {
-    method: "POST", redirect: "manual",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ token: secrets.controlToken }),
-  });
-  assert.equal(login.status, 302, "generated operator token works");
-  assert.ok(login.headers.get("set-cookie")?.includes("HttpOnly"), "operator cookie is HttpOnly");
+  // no sign-in: the dashboard is open to whoever can reach the server
+  assert.equal((await fetch(base + "/control")).status, 200);
+  assert.equal((await fetch(base + "/dashboard")).status, 200);
+  assert.equal((await fetch(base + "/login")).status, 404);
 
   const ws = new WebSocket(base.replace("http:", "ws:") + "/ws");
   const messages = [];
@@ -94,7 +90,15 @@ test("fresh self-host loads .env, keeps credentials private and restores data af
   ws.close();
   await closed;
   assert.ok(messages.some((m) => m.t === "welcome"), "public WebSocket connected");
-  assert.ok(messages.every((m) => !m.state?.overlayKey && !m.state?.rig), "public state omits operator data");
+  // no sign-in: a page socket is the operator role, so it does see this data
+  assert.ok(messages.every((m) => !m.state || typeof m.state !== "object" || m.state.entries !== undefined), "state snapshots arrive");
+  const keyed = new WebSocket(base.replace("http:", "ws:") + `/ws?key=${secrets.overlayKey}`);
+  const [overlayRaw] = await once(keyed, "message");
+  const overlayState = JSON.parse(overlayRaw).state;
+  assert.ok(!overlayState.rig && !overlayState.overlayKey, "overlay state omits operator data");
+  const keyedDone = once(keyed, "close");
+  keyed.close();
+  await keyedDone;
   // Windows child.kill() terminates without delivering a POSIX signal handler.
   // Wait for the normal debounced write before testing restart persistence there.
   if (process.platform === "win32") {
@@ -116,5 +120,5 @@ test("fresh self-host loads .env, keeps credentials private and restores data af
   restarted.close();
   await done;
   await stop();
-  assert.ok(!output.includes(secrets.controlToken) && !output.includes(secrets.overlayKey), "logs contain no generated credentials");
+  assert.ok(!output.includes(secrets.overlayKey), "logs contain no generated credentials");
 });

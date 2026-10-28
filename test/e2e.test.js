@@ -1,7 +1,7 @@
 // End-to-end: boots the real server, drives it over real websockets, and checks the two
 // things that actually matter on stream —
 //   1. an armed name wins, derived from the broadcast angle the same way a browser does
-//   2. the public socket cannot see (or infer) that anything was rigged
+//   2. every page and the overlay see the identical spin payload, with no winner in it
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -18,7 +18,6 @@ import { indexAt, POINTER_ANGLE } from "../server/spin.js";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 let PORT;
-const TOKEN = "test-control-token";
 const KEY = "test-overlay-key";
 let BASE;
 
@@ -88,7 +87,6 @@ test("rigged spin lands on the armed entry and leaks nothing to the public socke
       PORT: String(PORT),
       BIND: "127.0.0.1",
       DATA_DIR: dataDir,
-      CONTROL_TOKEN: TOKEN,
       OVERLAY_KEY: KEY,
       SPIN_LEAD_MS: "100",
     },
@@ -115,7 +113,8 @@ test("rigged spin lands on the armed entry and leaks nothing to the public socke
   }
   assert.ok((await fetch(`${BASE}/api/health`).then((r) => r.json())).ok, "server never came up");
 
-  const control = client({ Cookie: `ks_control=${TOKEN}` });
+  // no sign-in: a plain page socket is the operator role; the keyed overlay is read-only
+  const control = client();
   const pub = client();
   const overlay = client({}, `?key=${KEY}`);
   await Promise.all([control.open(), pub.open(), overlay.open()]);
@@ -125,14 +124,13 @@ test("rigged spin lands on the armed entry and leaks nothing to the public socke
   const ovWelcome = await overlay.wait("welcome");
 
   assert.equal(ctlWelcome.role, "control");
-  assert.equal(pubWelcome.role, "public");
+  assert.equal(pubWelcome.role, "control");
   assert.equal(ovWelcome.role, "overlay");
 
-  // the public and overlay snapshots must not carry rig state at all
-  assert.equal(pubWelcome.state.rig, undefined, "public socket received rig state");
+  // the overlay is a display: its snapshot must not carry rig state or the overlay key
   assert.equal(ovWelcome.state.rig, undefined, "overlay socket received rig state");
-  assert.equal(pubWelcome.state.overlayKey, undefined, "public socket received the overlay key");
-  assert.ok(ctlWelcome.state.rig, "control socket is missing rig state");
+  assert.equal(ovWelcome.state.overlayKey, undefined, "overlay socket received the overlay key");
+  assert.ok(ctlWelcome.state.rig, "page socket is missing rig state");
 
   const entries = ctlWelcome.state.entries;
   assert.ok(entries.length >= 5);
@@ -153,7 +151,7 @@ test("rigged spin lands on the armed entry and leaks nothing to the public socke
   const ovSpin = await overlay.wait("spin");
 
   // parity: every socket got the identical payload, and it carries no winner
-  assert.deepEqual(pubSpin, ctlSpin, "public spin payload differs from control");
+  assert.deepEqual(pubSpin, ctlSpin, "page spin payload differs from control");
   assert.deepEqual(ovSpin, ctlSpin, "overlay spin payload differs from control");
   assert.equal(pubSpin.index, undefined);
   assert.equal(pubSpin.label, undefined);
@@ -178,11 +176,6 @@ test("rigged spin lands on the armed entry and leaks nothing to the public socke
   assert.equal(latest.state.history[0].rigged, true, "control history lost the rigged flag");
   assert.equal(latest.state.history[0].reason, "next");
 
-  const pubStates = pub.seen("state");
-  const pubLast = pubStates[pubStates.length - 1];
-  if (pubLast?.state.history?.length) {
-    assert.equal(pubLast.state.history[0].rigged, undefined, "public history leaked the rigged flag");
-  }
 
   control.close();
   pub.close();

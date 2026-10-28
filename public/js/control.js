@@ -25,13 +25,8 @@ const net = connect({
 const wheel = createWheel($("wheel"), { now: () => net.now() });
 
 net.on((msg) => {
-  if (msg.t === "welcome" || msg.t === "state") {
-    if (msg.role && msg.role !== "control") {
-      location.href = "/login"; // sign-in expired between page load and socket connect
-      return;
-    }
-    apply(msg.state);
-  } else if (msg.t === "spin") {
+  if (msg.t === "welcome" || msg.t === "state") apply(msg.state);
+  else if (msg.t === "spin") {
     wheel.run(msg, state?.angle ?? 0, () => {});
   } else if (msg.t === "settled" && !msg.test) {
     celebrate(msg.label);
@@ -127,7 +122,7 @@ function apply(next) {
   $("nmVal").textContent = state.rig.nearMissPct || 0;
 
   const c = state.clients || {};
-  $("clients").textContent = `Open right now: ${c.public || 0} wheel page(s) · ${c.overlay || 0} OBS overlay(s) · ${c.control || 0} dashboard(s)`;
+  $("clients").textContent = `Open right now: ${c.control || 0} wheel/dashboard page(s) · ${c.overlay || 0} OBS overlay(s)`;
 
   if (first) renderOverlayUrl();
 }
